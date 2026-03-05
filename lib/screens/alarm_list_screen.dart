@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/alarm_card.dart';
 import '../widgets/expandable_fab.dart';
 import 'edit_alarm_screen.dart';
+import 'quick_alarm_screen.dart';
 
 class AlarmListScreen extends StatefulWidget {
   const AlarmListScreen({super.key});
@@ -154,19 +155,12 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
               await _openNewAlarm(context);
             },
             onQuickAlarm: () async {
-              final provider = context.read<AlarmProvider>();
-              final now = TimeOfDay.now();
-              var minute = now.minute + 5;
-              var hour = now.hour;
-              if (minute >= 60) {
-                minute -= 60;
-                hour = (hour + 1) % 24;
-              }
-              final quickTime = TimeOfDay(hour: hour, minute: minute);
-              final alarm = provider
-                  .createNewForTime(quickTime)
-                  .copyWith(label: 'Quick alarm');
-              await provider.addAlarm(alarm);
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const QuickAlarmScreen(),
+                  fullscreenDialog: true,
+                ),
+              );
             },
           ),
         ],

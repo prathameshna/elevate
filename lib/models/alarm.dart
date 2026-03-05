@@ -14,6 +14,8 @@ class Alarm {
   final String label;
   final List<int> repeatDays; // 1 = Monday ... 7 = Sunday
   final String sound;
+  final int volume; // 0-100
+  final bool vibration;
   final int snoozeMinutes;
   final bool isEnabled;
   final DateTime createdAt;
@@ -24,6 +26,8 @@ class Alarm {
     required this.label,
     required this.repeatDays,
     required this.sound,
+    required this.volume,
+    required this.vibration,
     required this.snoozeMinutes,
     required this.isEnabled,
     required this.createdAt,
@@ -35,6 +39,8 @@ class Alarm {
     String? label,
     List<int>? repeatDays,
     String? sound,
+    int? volume,
+    bool? vibration,
     int? snoozeMinutes,
     bool? isEnabled,
     DateTime? createdAt,
@@ -45,6 +51,8 @@ class Alarm {
       label: label ?? this.label,
       repeatDays: repeatDays ?? this.repeatDays,
       sound: sound ?? this.sound,
+      volume: volume ?? this.volume,
+      vibration: vibration ?? this.vibration,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
       isEnabled: isEnabled ?? this.isEnabled,
       createdAt: createdAt ?? this.createdAt,
@@ -59,6 +67,8 @@ class Alarm {
       'label': label,
       'repeatDays': repeatDays,
       'sound': sound,
+      'volume': volume,
+      'vibration': vibration,
       'snoozeMinutes': snoozeMinutes,
       'isEnabled': isEnabled,
       'createdAt': createdAt.toIso8601String(),
@@ -75,6 +85,8 @@ class Alarm {
       label: json['label'] as String? ?? '',
       repeatDays: List<int>.from(json['repeatDays'] as List<dynamic>? ?? []),
       sound: json['sound'] as String? ?? 'Default',
+      volume: json['volume'] as int? ?? 50,
+      vibration: json['vibration'] as bool? ?? true,
       snoozeMinutes: json['snoozeMinutes'] as int? ?? 5,
       isEnabled: json['isEnabled'] as bool? ?? true,
       createdAt: DateTime.parse(json['createdAt'] as String),

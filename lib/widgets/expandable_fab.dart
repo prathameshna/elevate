@@ -29,6 +29,7 @@ class _ExpandableFabState extends State<ExpandableFab>
 
   bool _open = false;
   bool _isAnimating = false;
+  bool _isTransitioning = false;
 
   @override
   void initState() {
@@ -76,12 +77,12 @@ class _ExpandableFabState extends State<ExpandableFab>
   }
 
   void _toggle() {
-    if (_isAnimating) return;
+    if (_isAnimating || _isTransitioning) return;
     setState(() {
       _isAnimating = true;
       _open = !_open;
     });
-    HapticFeedback.lightImpact();
+    HapticFeedback.mediumImpact(); // More pronounced impact for primary action
     if (_open) {
       _controller.forward();
     } else {
@@ -90,16 +91,22 @@ class _ExpandableFabState extends State<ExpandableFab>
   }
 
   Future<void> _handleAction(FabActionCallback action) async {
-    if (_isAnimating) return;
+    if (_isAnimating || _isTransitioning) return;
     setState(() {
-      _isAnimating = true;
+      _isTransitioning = true;
     });
-    HapticFeedback.selectionClick();
+    
+    // Immediate haptic feedback (success pattern-like)
+    await HapticFeedback.vibrate();
+    
     await action();
+    
+    // Close menu and reset states
     _open = false;
     await _controller.reverse();
+    
     setState(() {
-      _isAnimating = false;
+      _isTransitioning = false;
     });
   }
 

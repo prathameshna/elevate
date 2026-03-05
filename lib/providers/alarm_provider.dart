@@ -92,6 +92,8 @@ class AlarmProvider extends ChangeNotifier {
       label: '',
       repeatDays: const [],
       sound: 'Default',
+      volume: 50,
+      vibration: true,
       snoozeMinutes: 5,
       isEnabled: true,
       createdAt: DateTime.now(),
