@@ -248,177 +248,380 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final safeAreaBottom = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          _isEditMode ? 'Edit alarm' : 'Create alarm',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Stack(
+      body: Column(
         children: [
-          SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          // === HEADER SECTION (Non-scrollable, Professional) ===
+          _buildProfessionalHeader(context),
+
+          // === SCROLLABLE CONTENT ===
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + safeAreaBottom + 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // --- TIME PICKER SECTION ---
+                  _buildProfessionalTimePicker(),
+                  const SizedBox(height: 12),
+
+                  // --- DAYS SELECTOR SECTION ---
+                  _buildProfessionalDaysSelector(),
+                  const SizedBox(height: 12),
+
+                  // --- SETTINGS SECTION ---
+                  _buildSectionLabel('Settings'),
+                  const SizedBox(height: 12),
+                  _buildProfessionalSettingTile(
+                    label: 'Mission',
+                    value: _selectedMission.isEmpty ? 'None' : _selectedMission,
+                    onTap: _openMissionSelection,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildProfessionalSettingTile(
+                    label: 'Sound',
+                    value: _selectedSound,
+                    onTap: _openSoundSelection,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildProfessionalSettingTile(
+                    label: 'Vibration',
+                    value: _selectedVibration,
+                    onTap: _openVibrationSelection,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildProfessionalSettingTile(
+                    label: 'Snooze',
+                    value: '$_snoozeMinutes min${_alwaysSnooze ? ', forever' : ''}',
+                    onTap: _openSnoozeConfig,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- TOGGLES SECTION ---
+                  _buildProfessionalToggleTile(
+                    icon: Icons.check_circle_outline,
+                    label: 'Wake Up Check',
+                    value: _enableWakeUpCheck,
+                    onToggle: (v) => setState(() => _enableWakeUpCheck = v),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildProfessionalToggleTile(
+                    icon: Icons.note_outlined,
+                    label: 'Show memo after alarm',
+                    value: _showMemoAfter,
+                    onToggle: (v) => setState(() => _showMemoAfter = v),
+                  ),
+
+                  // --- CONDITIONAL MEMO ---
+                  AnimatedCrossFade(
+                    firstChild: const SizedBox(width: double.infinity),
+                    secondChild: Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: _buildProfessionalMemoInput(),
+                    ),
+                    crossFadeState: _showMemoAfter ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                    duration: const Duration(milliseconds: 200),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // === SAVE BUTTON (Outside scroll, respects safe area) ===
+          _buildProfessionalSaveButton(safeAreaBottom),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfessionalHeader(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8, bottom: 12, left: 8, right: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF1A1A1A), Color(0xFF0F0F0F)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFFF5F5F5), size: 24),
+            onPressed: () => Navigator.of(context).pop(),
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    _getTimeUntilAlarm(),
-                    style: const TextStyle(
-                      color: Color(0xFFA0A0A0),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                Text(
+                  _isEditMode ? 'Edit alarm' : 'Create alarm',
+                  style: const TextStyle(
+                    color: Color(0xFFF5F5F5),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // === TIME PICKER BUTTON ===
-                GestureDetector(
-                  onTap: _pickTime,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.access_time_filled, color: Color(0xFFA0A0A0), size: 28),
-                        const SizedBox(width: 16),
-                        Text(
-                          _selectedTime.format(context),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  _getTimeUntilAlarm(),
+                  style: const TextStyle(
+                    color: Color(0xFFA0A0A0),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
-                const SizedBox(height: 24),
-
-                // === DAYS SELECTOR ===
-                DayOfWeekSelector(
-                  selectedDays: _selectedDays,
-                  onDaysChanged: (days) => setState(() => _selectedDays = days),
-                ),
-                const SizedBox(height: 24),
-
-                // === SETTINGS TILES ===
-                _buildSectionLabel('Settings'),
-                const SizedBox(height: 12),
-                _buildSettingTile(
-                  label: 'Mission',
-                  value: _selectedMission.isEmpty ? 'None' : _selectedMission,
-                  onTap: _openMissionSelection,
-                ),
-                const SizedBox(height: 12),
-                _buildSettingTile(
-                  label: 'Sound',
-                  value: _selectedSound,
-                  onTap: _openSoundSelection,
-                ),
-                const SizedBox(height: 12),
-                _buildSettingTile(
-                  label: 'Vibration',
-                  value: _selectedVibration,
-                  onTap: _openVibrationSelection,
-                ),
-                const SizedBox(height: 12),
-                _buildSettingTile(
-                  label: 'Snooze',
-                  value: '$_snoozeMinutes min${_alwaysSnooze ? ', forever' : ''}',
-                  onTap: _openSnoozeConfig,
-                ),
-                const SizedBox(height: 24),
-
-                // === TOGGLES ===
-                _buildToggleTile(
-                  icon: Icons.check_circle_outline,
-                  label: 'Wake Up Check',
-                  value: _enableWakeUpCheck,
-                  onToggle: (v) => setState(() => _enableWakeUpCheck = v),
-                ),
-                const SizedBox(height: 12),
-                _buildToggleTile(
-                  icon: Icons.note_outlined,
-                  label: 'Show memo after alarm',
-                  value: _showMemoAfter,
-                  onToggle: (v) => setState(() => _showMemoAfter = v),
-                ),
-
-                if (_showMemoAfter) ...[
-                  const SizedBox(height: 12),
-                  _buildMemoInput(),
-                ],
-
-                const SizedBox(height: 120), // Space for sticky button
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
 
-          // === STICKY SAVE BUTTON ===
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: double.infinity,
-              height: 100,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF1A1A1A).withOpacity(0),
-                    const Color(0xFF1A1A1A),
-                  ],
-                ),
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _saveAlarm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD600),
-                    foregroundColor: const Color(0xFF1A1A1A),
-                    disabledBackgroundColor: const Color(0xFFFFD600).withOpacity(0.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1A1A1A)),
-                        )
-                      : const Text(
-                          'Save',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                ),
-              ),
+  Widget _buildProfessionalTimePicker() {
+    return GestureDetector(
+      onTap: _pickTime,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              offset: const Offset(0, 4),
+              blurRadius: 12,
             ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _selectedTime.format(context),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  _selectedTime.period == DayPeriod.am ? 'AM' : 'PM',
+                  style: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 12),
+                ),
+              ],
+            ),
+            const Icon(Icons.access_time_filled, color: Color(0xFFF59E0B), size: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalDaysSelector() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            offset: const Offset(0, 4),
+            blurRadius: 12,
           ),
         ],
+      ),
+      child: DayOfWeekSelector(
+        selectedDays: _selectedDays,
+        onDaysChanged: (days) => setState(() => _selectedDays = days),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalSettingTile({required String label, required String value, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(color: Color(0xFFF5F5F5), fontSize: 14, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 12, fontWeight: FontWeight.w400),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right, color: Color(0xFFA0A0A0), size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalToggleTile({required IconData icon, required String label, required bool value, required Function(bool) onToggle}) {
+    return GestureDetector(
+      onTap: () => onToggle(!value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(icon, color: const Color(0xFFA0A0A0), size: 20),
+                  const SizedBox(width: 12),
+                  Text(
+                    label,
+                    style: const TextStyle(color: Color(0xFFF5F5F5), fontSize: 14, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: value,
+              onChanged: onToggle,
+              activeColor: const Color(0xFF14B8A6),
+              inactiveTrackColor: const Color(0xFF3A3A3A),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalMemoInput() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF3A3A3A)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _memoController,
+        maxLines: null,
+        minLines: 3,
+        cursorColor: const Color(0xFF14B8A6),
+        style: const TextStyle(color: Color(0xFFF5F5F5), fontSize: 14, fontWeight: FontWeight.w400),
+        decoration: const InputDecoration(
+          hintText: 'Enter an alarm memo',
+          hintStyle: TextStyle(color: Color(0xFFA0A0A0)),
+          border: InputBorder.none,
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfessionalSaveButton(double safeAreaBottom) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, safeAreaBottom > 0 ? 0 : 16),
+        child: Container(
+          width: double.infinity,
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFFD600).withOpacity(0.3),
+                offset: const Offset(0, 8),
+                blurRadius: 24,
+              ),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _saveAlarm,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD600),
+              foregroundColor: const Color(0xFF1A1A1A),
+              disabledBackgroundColor: const Color(0xFFFFD600).withOpacity(0.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 0,
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1A1A1A)),
+                  )
+                : const Text(
+                    'Save',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -430,92 +633,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         color: Color(0xFFA0A0A0),
         fontSize: 14,
         fontWeight: FontWeight.w500,
-      ),
-    );
-  }
-
-  Widget _buildSettingTile({required String label, required String value, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 12),
-                ),
-              ],
-            ),
-            const Icon(Icons.chevron_right, color: Color(0xFFA0A0A0)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggleTile({required IconData icon, required String label, required bool value, required Function(bool) onToggle}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: const Color(0xFFA0A0A0), size: 20),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          Switch.adaptive(
-            value: value,
-            onChanged: onToggle,
-            activeColor: const Color(0xFF14B8A6),
-            inactiveTrackColor: const Color(0xFF3A3A3A),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMemoInput() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF3A3A3A)),
-      ),
-      child: TextField(
-        controller: _memoController,
-        maxLines: null,
-        minLines: 3,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        decoration: const InputDecoration(
-          hintText: 'Enter an alarm memo',
-          hintStyle: TextStyle(color: Color(0xFFA0A0A0)),
-          border: InputBorder.none,
-        ),
       ),
     );
   }
