@@ -8,6 +8,7 @@ import '../providers/alarm_provider.dart';
 import '../services/alarm_service.dart';
 import '../widgets/day_selector/day_selector_widget.dart';
 import '../widgets/mission_card.dart';
+import '../widgets/time_picker/time_picker_wheel.dart';
 import '../widgets/snooze_config_modal.dart';
 import 'mission_selection_screen.dart';
 import 'sound_selection_screen.dart';
@@ -28,6 +29,9 @@ class EditAlarmScreen extends StatefulWidget {
 class _EditAlarmScreenState extends State<EditAlarmScreen> {
   // === STATE VARIABLES ===
   late TimeOfDay _selectedTime;
+  late int _selectedHour;
+  late int _selectedMinute;
+  late bool _isAM;
   late Set<int> _selectedDays;
   late bool _isEnabled;
   late String _selectedSound;
@@ -57,6 +61,10 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       try {
         final alarm = AlarmService.instance.alarms.firstWhere((a) => a.id == widget.alarmId);
         _selectedTime = alarm.time;
+        final h = _selectedTime.hour;
+        _isAM = h < 12;
+        _selectedHour = h % 12 == 0 ? 12 : h % 12;
+        _selectedMinute = _selectedTime.minute;
         _isEnabled = alarm.isEnabled;
         _selectedDays = Set<int>.from(alarm.selectedDays);
         _assignedMissions = List<String>.from(alarm.missionIds);
@@ -83,6 +91,10 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       }
     } else {
       _selectedTime = TimeOfDay.now();
+      final h = _selectedTime.hour;
+      _isAM = h < 12;
+      _selectedHour = h % 12 == 0 ? 12 : h % 12;
+      _selectedMinute = _selectedTime.minute;
       _isEnabled = true;
       _selectedDays = {};
       _assignedMissions = [];
@@ -106,29 +118,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   }
 
 
-  Future<void> _pickTime() async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF14B8A6),
-              onPrimary: Colors.white,
-              surface: Color(0xFF2A2A2A),
-              onSurface: Colors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedTime) {
-      setState(() => _selectedTime = picked);
-      HapticFeedback.selectionClick();
-    }
-  }
 
 
   void _openSoundSelection() async {
@@ -274,7 +263,21 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // --- TIME PICKER SECTION ---
-                  _buildProfessionalTimePicker(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: TimePickerWheel(
+                      initialTime: _selectedTime,
+                      onTimeChanged: (time) {
+                        setState(() {
+                          _selectedTime = time;
+                          final h = time.hour;
+                          _isAM = h < 12;
+                          _selectedHour = h % 12 == 0 ? 12 : h % 12;
+                          _selectedMinute = time.minute;
+                        });
+                      },
+                    ),
+                  ),
                   
                   // --- SCHEDULE SECTION (New Redesigned Day Selector) ---
                   Padding(
@@ -447,50 +450,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
     );
   }
 
-  Widget _buildProfessionalTimePicker() {
-    return GestureDetector(
-      onTap: _pickTime,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              offset: const Offset(0, 4),
-              blurRadius: 12,
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _selectedTime.format(context),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  _selectedTime.period == DayPeriod.am ? 'AM' : 'PM',
-                  style: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 12),
-                ),
-              ],
-            ),
-            const Icon(Icons.access_time_filled, color: Color(0xFFF59E0B), size: 40),
-          ],
-        ),
-      ),
-    );
-  }
 
 
   Widget _buildProfessionalSettingTile({required String label, required String value, required VoidCallback onTap}) {
