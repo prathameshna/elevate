@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/alarm.dart';
 import '../models/mission.dart';
 import '../providers/alarm_provider.dart';
+import '../services/alarm_service.dart';
 import '../widgets/day_selector/day_selector_widget.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/snooze_config_modal.dart';
@@ -191,30 +192,11 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   }
 
   Future<void> _saveAlarm() async {
-    if (_selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one day'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
+    if (_isLoading) return;
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
     try {
-      final provider = context.read<AlarmProvider>();
-      final now = DateTime.now();
-      final alarmTime = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
-      );
-
       final alarm = Alarm(
         id: _isEditMode ? widget.alarmId! : DateTime.now().millisecondsSinceEpoch.toString(),
         time: _selectedTime,
@@ -234,21 +216,62 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       );
 
       if (_isEditMode) {
-        await provider.updateAlarm(alarm);
+        await AlarmService.instance.updateAlarm(alarm);
       } else {
-        await provider.addAlarm(alarm);
+        await AlarmService.instance.createAlarm(alarm);
       }
 
+      if (!mounted) return;
+
       HapticFeedback.heavyImpact();
-      if (mounted) Navigator.of(context).pop();
+
+      // Show teal success snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.alarm_on_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Text(
+                'Alarm set for ${_formatAlarmTime()}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF14B8A6),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      Navigator.pop(context, alarm);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to save alarm: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
-      setState(() => _isLoading = false);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // Helper to format time for snackbar
+  String _formatAlarmTime() {
+    final hour = _selectedTime.hourOfPeriod == 0 ? 12 : _selectedTime.hourOfPeriod;
+    final minute = _selectedTime.minute.toString().padLeft(2, '0');
+    final period = _selectedTime.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
   }
 
   @override

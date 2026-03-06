@@ -1,30 +1,63 @@
 import '../models/alarm.dart';
-import '../providers/alarm_provider.dart';
-import 'alarm_scheduler.dart';
+import 'alarm_storage.dart';
+import 'notification_service.dart';
 
 class AlarmService {
   AlarmService._();
   static final AlarmService instance = AlarmService._();
 
-  late AlarmProvider _provider;
+  List<Alarm> _alarms = [];
+  List<Alarm> get alarms => List.unmodifiable(_alarms);
 
-  void init(AlarmProvider provider) {
-    _provider = provider;
+  bool _loaded = false;
+
+  Future<void> init() async {
+    if (_loaded) return;
+    _alarms = await AlarmStorage.loadAll();
+    _loaded = true;
   }
 
-  // UPDATE alarm (called when toggle changes)
+  // Force reload from disk
+  Future<void> reload() async {
+    _alarms = await AlarmStorage.loadAll();
+  }
+
+  Future<void> createAlarm(Alarm alarm) async {
+    _alarms.add(alarm);
+    await AlarmStorage.saveAll(_alarms);
+    if (alarm.isEnabled) {
+      await NotificationService.instance.scheduleAlarm(alarm);
+    }
+  }
+
   Future<void> updateAlarm(Alarm updated) async {
-    await _provider.updateAlarm(updated);
+    final index = _alarms.indexWhere((a) => a.id == updated.id);
+    if (index == -1) return;
+    _alarms[index] = updated;
+    await AlarmStorage.saveAll(_alarms);
+    // Always cancel then reschedule
+    await NotificationService.instance.cancelAlarm(updated.id);
+    if (updated.isEnabled) {
+      await NotificationService.instance.scheduleAlarm(updated);
+    }
   }
 
-  // SCHEDULE native alarm notification
-  Future<void> scheduleAlarm(Alarm alarm) async {
-    if (!alarm.isEnabled) return;
-    await AlarmScheduler.instance.scheduleAlarm(alarm);
+  Future<void> deleteAlarm(String id) async {
+    await NotificationService.instance.cancelAlarm(id);
+    _alarms.removeWhere((a) => a.id == id);
+    await AlarmStorage.saveAll(_alarms);
   }
 
-  // CANCEL native alarm notification
-  Future<void> cancelAlarm(String alarmId) async {
-    await AlarmScheduler.instance.cancelAlarm(alarmId);
+  Future<void> toggleAlarm(String id, bool isEnabled) async {
+    final index = _alarms.indexWhere((a) => a.id == id);
+    if (index == -1) return;
+    final updated = _alarms[index].copyWith(isEnabled: isEnabled);
+    _alarms[index] = updated;
+    await AlarmStorage.saveAll(_alarms);
+    if (isEnabled) {
+      await NotificationService.instance.scheduleAlarm(updated);
+    } else {
+      await NotificationService.instance.cancelAlarm(id);
+    }
   }
 }

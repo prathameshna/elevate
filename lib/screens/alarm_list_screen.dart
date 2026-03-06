@@ -18,32 +18,53 @@ class AlarmListScreen extends StatefulWidget {
 }
 
 class _AlarmListScreenState extends State<AlarmListScreen> {
+  List<Alarm> _alarms = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
-    // Alarms are loaded in provider constructor
+    _loadAlarms();
+  }
+
+  Future<void> _loadAlarms() async {
+    await AlarmService.instance.init();
+    if (mounted) {
+      setState(() {
+        _alarms = AlarmService.instance.alarms.toList();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _refreshAlarms() {
+    setState(() {
+      _alarms = AlarmService.instance.alarms.toList();
+    });
   }
 
   Future<void> _openNewAlarm(BuildContext context) async {
-    await Navigator.of(context).push(
+    final result = await Navigator.of(context).push<Alarm>(
       MaterialPageRoute(
         builder: (_) => const EditAlarmScreen(),
         fullscreenDialog: true,
       ),
     );
+    if (result != null) _refreshAlarms();
   }
 
   Future<void> _openEditAlarm(BuildContext context, Alarm alarm) async {
-    await Navigator.of(context).push(
+    final result = await Navigator.of(context).push<Alarm>(
       MaterialPageRoute(
         builder: (_) => EditAlarmScreen(alarmId: alarm.id),
         fullscreenDialog: true,
       ),
     );
+    if (result != null) _refreshAlarms();
   }
 
-  void _confirmDelete(BuildContext context, Alarm alarm) {
-    showDialog<void>(
+  Future<void> _confirmDelete(BuildContext context, Alarm alarm) async {
+    final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1F1F1F),
@@ -53,14 +74,11 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await context.read<AlarmProvider>().deleteAlarm(alarm.id);
-            },
+            onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text(
               'Delete',
               style: TextStyle(color: ElevateTheme.warning),
@@ -69,6 +87,16 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
         ],
       ),
     );
+
+    if (confirmed == true) {
+      await AlarmService.instance.deleteAlarm(alarm.id);
+      _refreshAlarms();
+    }
+  }
+
+  Future<void> _toggleAlarm(String id, bool isEnabled) async {
+    await AlarmService.instance.toggleAlarm(id, isEnabled);
+    _refreshAlarms();
   }
 
   @override
@@ -97,43 +125,26 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                   ),
                   const SizedBox(height: 24),
                   Expanded(
-                    child: Consumer<AlarmProvider>(
-                      builder: (context, provider, _) {
-                        if (provider.isLoading) {
+                    child: Builder(
+                      builder: (context) {
+                        if (_isLoading) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
                         }
-                        if (provider.alarms.isEmpty) {
+                        if (_alarms.isEmpty) {
                           return _EmptyState(theme: theme);
                         }
                         return ListView.separated(
                           padding: const EdgeInsets.only(bottom: 96),
-                          itemCount: provider.alarms.length,
+                          itemCount: _alarms.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 12),
                           itemBuilder: (context, index) {
-                            final alarm = provider.alarms[index];
+                            final alarm = _alarms[index];
                             return AlarmCard(
                               alarm: alarm,
-                              onToggleChanged: (newValue) async {
-                                // Step 1 — update UI immediately
-                                setState(() {
-                                  alarm.isEnabled = newValue;
-                                });
-
-                                // Step 2 — persist to storage
-                                await AlarmService.instance.updateAlarm(
-                                  alarm.copyWith(isEnabled: newValue),
-                                );
-
-                                // Step 3 — schedule or cancel native alarm
-                                if (newValue) {
-                                  await AlarmService.instance.scheduleAlarm(alarm);
-                                } else {
-                                  await AlarmService.instance.cancelAlarm(alarm.id);
-                                }
-                              },
+                              onToggleChanged: (newValue) => _toggleAlarm(alarm.id, newValue),
                               onTap: () => _openEditAlarm(context, alarm),
                               onDelete: () => _confirmDelete(context, alarm),
                             );

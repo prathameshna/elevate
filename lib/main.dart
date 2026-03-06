@@ -4,12 +4,18 @@ import 'package:provider/provider.dart';
 
 import 'providers/alarm_provider.dart';
 import 'services/alarm_service.dart';
+import 'services/notification_service.dart';
 import 'screens/alarm_list_screen.dart';
 import 'screens/shell_screens.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Must initialize in this order
+  await NotificationService.instance.init();
+  await AlarmService.instance.init();
+
   SystemChrome.setPreferredOrientations(
     [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown],
   );
@@ -27,18 +33,12 @@ class ElevateApp extends StatelessWidget {
           create: (_) => AlarmProvider(),
         ),
       ],
-      child: Builder(
-        builder: (context) {
-          final alarmProvider = Provider.of<AlarmProvider>(context, listen: false);
-          AlarmService.instance.init(alarmProvider);
-          return MaterialApp(
-            title: 'Elevate',
-            debugShowCheckedModeBanner: false,
-            themeMode: ThemeMode.dark,
-            darkTheme: ElevateTheme.darkTheme(context),
-            home: const _RootScaffold(),
-          );
-        },
+      child: MaterialApp(
+        title: 'Elevate',
+        debugShowCheckedModeBanner: false,
+        themeMode: ThemeMode.dark,
+        darkTheme: ElevateTheme.darkTheme(context),
+        home: const _RootScaffold(),
       ),
     );
   }
