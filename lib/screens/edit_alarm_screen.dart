@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/alarm.dart';
+import '../models/mission.dart';
 import '../providers/alarm_provider.dart';
-import '../widgets/day_of_week_selector.dart';
+import '../widgets/day_selector/day_selector_widget.dart';
+import '../widgets/mission_card.dart';
 import '../widgets/snooze_config_modal.dart';
 import 'mission_selection_screen.dart';
 import 'sound_selection_screen.dart';
@@ -77,6 +79,12 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
     _isLoading = false;
     _memoController = TextEditingController(text: _memoText);
+  }
+
+  @override
+  void dispose() {
+    _memoController.dispose();
+    super.dispose();
   }
 
   String _getTimeUntilAlarm() {
@@ -241,12 +249,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   }
 
   @override
-  void dispose() {
-    _memoController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
@@ -268,21 +270,56 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
                 children: [
                   // --- TIME PICKER SECTION ---
                   _buildProfessionalTimePicker(),
-                  const SizedBox(height: 12),
+                  
+                  // --- SCHEDULE SECTION (New Redesigned Day Selector) ---
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8, top: 20),
+                    child: const Text(
+                      'SCHEDULE',
+                      style: TextStyle(
+                        color: Color(0xFFA0A0A0),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                  DaySelectorWidget(
+                    selectedDays: _selectedDays,
+                    onDaysChanged: (days) {
+                      if (!mounted) return;
+                      setState(() => _selectedDays = days);
+                    },
+                  ),
+                  const SizedBox(height: 20),
 
-                  // --- DAYS SELECTOR SECTION ---
-                  _buildProfessionalDaysSelector(),
-                  const SizedBox(height: 12),
+                  // --- MISSION CARD (Redesigned & Responsive) ---
+                  if (_selectedMission.isNotEmpty) ...[
+                    _buildSectionLabel('Mission Settings'),
+                    const SizedBox(height: 12),
+                    MissionCard(
+                      mission: Mission(
+                        id: _selectedMission,
+                        name: 'Wake-up mission',
+                        description: 'Daily mission',
+                        selectedDays: _selectedDays,
+                        enableWakeUpCheck: _enableWakeUpCheck,
+                      ),
+                      onMissionUpdated: (updatedMission) {
+                        if (!mounted) return;
+                        setState(() {
+                          _selectedDays = updatedMission.selectedDays;
+                          _enableWakeUpCheck = updatedMission.enableWakeUpCheck;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   // --- SETTINGS SECTION ---
                   _buildSectionLabel('Settings'),
                   const SizedBox(height: 12),
-                  _buildProfessionalSettingTile(
-                    label: 'Mission',
-                    value: _selectedMission.isEmpty ? 'None' : _selectedMission,
-                    onTap: _openMissionSelection,
-                  ),
-                  const SizedBox(height: 12),
+                  // Mission tile removed as it's now in MissionCard
                   _buildProfessionalSettingTile(
                     label: 'Sound',
                     value: _selectedSound,
@@ -303,13 +340,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
                   const SizedBox(height: 24),
 
                   // --- TOGGLES SECTION ---
-                  _buildProfessionalToggleTile(
-                    icon: Icons.check_circle_outline,
-                    label: 'Wake Up Check',
-                    value: _enableWakeUpCheck,
-                    onToggle: (v) => setState(() => _enableWakeUpCheck = v),
-                  ),
-                  const SizedBox(height: 12),
+                  // Wake Up Check tile removed as it's now in MissionCard
                   _buildProfessionalToggleTile(
                     icon: Icons.note_outlined,
                     label: 'Show memo after alarm',
@@ -439,26 +470,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
     );
   }
 
-  Widget _buildProfessionalDaysSelector() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            offset: const Offset(0, 4),
-            blurRadius: 12,
-          ),
-        ],
-      ),
-      child: DayOfWeekSelector(
-        selectedDays: _selectedDays,
-        onDaysChanged: (days) => setState(() => _selectedDays = days),
-      ),
-    );
-  }
 
   Widget _buildProfessionalSettingTile({required String label, required String value, required VoidCallback onTap}) {
     return GestureDetector(
