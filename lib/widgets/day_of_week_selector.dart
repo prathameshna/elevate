@@ -1,97 +1,102 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../theme/app_theme.dart';
+class DayOfWeekSelector extends StatefulWidget {
+  final List<int> selectedDays; // 0=Sun, 1=Mon, ..., 6=Sat
+  final Function(List<int>) onDaysChanged;
 
-class DayOfWeekSelector extends StatelessWidget {
   const DayOfWeekSelector({
     super.key,
     required this.selectedDays,
-    required this.onChanged,
+    required this.onDaysChanged,
   });
 
-  final List<int> selectedDays; // 1 = Monday ... 7 = Sunday
-  final ValueChanged<List<int>> onChanged;
+  @override
+  State<DayOfWeekSelector> createState() => _DayOfWeekSelectorState();
+}
 
-  static const _labels = <int, String>{
-    7: 'S',
-    1: 'M',
-    2: 'T',
-    3: 'W',
-    4: 'T',
-    5: 'F',
-    6: 'S',
-  };
+class _DayOfWeekSelectorState extends State<DayOfWeekSelector> {
+  late List<int> _localSelectedDays;
+  static const List<String> _dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  @override
+  void initState() {
+    super.initState();
+    _localSelectedDays = List<int>.from(widget.selectedDays);
+  }
+
+  void _toggleDay(int dayIndex) {
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      if (_localSelectedDays.contains(dayIndex)) {
+        _localSelectedDays.remove(dayIndex);
+      } else {
+        _localSelectedDays.add(dayIndex);
+      }
+      _localSelectedDays.sort();
+    });
+
+    widget.onDaysChanged(_localSelectedDays);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final ordered = [7, 1, 2, 3, 4, 5, 6];
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final day in ordered)
-          _DayChip(
-            label: _labels[day] ?? '',
-            isSelected: selectedDays.contains(day),
-            onTap: () {
-              final current = List<int>.from(selectedDays);
-              if (current.contains(day)) {
-                current.remove(day);
-              } else {
-                current.add(day);
-              }
-              current.sort();
-              onChanged(current);
+        const Text(
+          'Repeat',
+          style: TextStyle(
+            color: Color(0xFFA0A0A0),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(
+            7,
+            (index) {
+              final isSelected = _localSelectedDays.contains(index);
+
+              return GestureDetector(
+                onTap: () => _toggleDay(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected
+                        ? const Color(0xFF14B8A6)
+                        : const Color(0xFF2A2A2A),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFFFFD600)
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _dayLabels[index],
+                      style: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : const Color(0xFFA0A0A0),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              );
             },
           ),
+        ),
       ],
     );
   }
 }
-
-class _DayChip extends StatelessWidget {
-  const _DayChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color:
-              isSelected ? ElevateTheme.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: isSelected
-                ? ElevateTheme.accent
-                : Colors.grey.shade600,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: isSelected ? Colors.white : ElevateTheme.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-}
-

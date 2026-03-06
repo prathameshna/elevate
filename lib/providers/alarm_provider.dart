@@ -1,121 +1,127 @@
-import 'dart:math';
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/alarm.dart';
 import '../services/alarm_scheduler.dart';
-import '../services/alarm_storage.dart';
 
 class AlarmProvider extends ChangeNotifier {
-  AlarmProvider({
-    AlarmStorage? storage,
-    AlarmScheduler? scheduler,
-  })  : _storage = storage ?? AlarmStorage(),
-        _scheduler = scheduler ?? AlarmScheduler.instance;
-
-  final AlarmStorage _storage;
-  final AlarmScheduler _scheduler;
-
   final List<Alarm> _alarms = [];
-  bool _initialized = false;
-  bool _isLoading = false;
+  bool _isLoading = true;
 
-  List<Alarm> get alarms =>
-      List.unmodifiable(_alarms..sort((a, b) => _compareTime(a, b)));
-
+  List<Alarm> get alarms => List.unmodifiable(_alarms);
   bool get isLoading => _isLoading;
 
-  Future<void> initialize() async {
-    if (_initialized) return;
+  AlarmProvider() {
+    _loadAlarms();
+  }
+
+  Future<void> _loadAlarms() async {
     _isLoading = true;
     notifyListeners();
-    final loaded = await _storage.loadAlarms();
-    _alarms
-      ..clear()
-      ..addAll(loaded);
-    _initialized = true;
-    _isLoading = false;
-    notifyListeners();
-    await _scheduler.rescheduleAll(_alarms);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final alarmData = prefs.getStringList('alarms') ?? [];
+      
+      _alarms.clear();
+      for (final item in alarmData) {
+        try {
+          _alarms.add(Alarm.fromJson(jsonDecode(item)));
+        } catch (e) {
+          debugPrint('Error decoding alarm: $e');
+        }
+      }
+      _sortAlarms();
+    } catch (e) {
+      debugPrint('Error loading alarms: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _saveAlarms() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final alarmData = _alarms.map((a) => jsonEncode(a.toJson())).toList();
+      await prefs.setStringList('alarms', alarmData);
+    } catch (e) {
+      debugPrint('Error saving alarms: $e');
+    }
+  }
+
+  void _sortAlarms() {
+    _alarms.sort((a, b) {
+      final aMinutes = a.time.hour * 60 + a.time.minute;
+      final bMinutes = b.time.hour * 60 + b.time.minute;
+      return aMinutes.compareTo(bMinutes);
+    });
   }
 
   Future<void> addAlarm(Alarm alarm) async {
     _alarms.add(alarm);
-    await _persist();
-    await _scheduler.scheduleAlarm(alarm);
+    _sortAlarms();
+    await _saveAlarms();
+    await AlarmScheduler.instance.scheduleAlarm(alarm);
     notifyListeners();
   }
 
   Future<void> updateAlarm(Alarm alarm) async {
     final index = _alarms.indexWhere((a) => a.id == alarm.id);
-    if (index == -1) return;
-    final old = _alarms[index];
-    _alarms[index] = alarm;
-    await _persist();
-    if (!old.isEnabled && alarm.isEnabled) {
-      await _scheduler.scheduleAlarm(alarm);
-    } else if (old.isEnabled && !alarm.isEnabled) {
-      await _scheduler.cancelAlarm(alarm);
-    } else if (alarm.isEnabled) {
-      await _scheduler.scheduleAlarm(alarm);
+    if (index != -1) {
+      _alarms[index] = alarm;
+      _sortAlarms();
+      await _saveAlarms();
+      await AlarmScheduler.instance.scheduleAlarm(alarm);
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> deleteAlarm(String id) async {
     final index = _alarms.indexWhere((a) => a.id == id);
-    if (index == -1) return;
-    final alarm = _alarms.removeAt(index);
-    await _persist();
-    await _scheduler.cancelAlarm(alarm);
-    notifyListeners();
+    if (index != -1) {
+      final alarm = _alarms[index];
+      _alarms.removeAt(index);
+      await _saveAlarms();
+      await AlarmScheduler.instance.cancelAlarm(alarm.id);
+      notifyListeners();
+    }
   }
 
-  Future<void> toggleAlarm(String id, bool enabled) async {
+  Future<void> toggleAlarm(String id) async {
     final index = _alarms.indexWhere((a) => a.id == id);
-    if (index == -1) return;
-    final updated = _alarms[index].copyWith(isEnabled: enabled);
-    _alarms[index] = updated;
-    await _persist();
-    if (enabled) {
-      await _scheduler.scheduleAlarm(updated);
-    } else {
-      await _scheduler.cancelAlarm(updated);
+    if (index != -1) {
+      final alarm = _alarms[index];
+      final updated = alarm.copyWith(enabled: !alarm.enabled);
+      _alarms[index] = updated;
+      await _saveAlarms();
+      
+      if (updated.enabled) {
+        await AlarmScheduler.instance.scheduleAlarm(updated);
+      } else {
+        await AlarmScheduler.instance.cancelAlarm(updated.id);
+      }
+      
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Alarm createNewForTime(TimeOfDay time) {
+    final now = DateTime.now();
+    final alarmTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
+    );
     return Alarm(
-      id: _generateId(),
-      time: time,
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      time: alarmTime,
       label: '',
-      repeatDays: const [],
-      sound: 'Default',
-      volume: 50,
-      vibration: true,
-      snoozeMinutes: 5,
-      isEnabled: true,
-      createdAt: DateTime.now(),
+      sound: 'default_alarm',
+      enabled: true,
+      repeatDays: [], // Practical spec uses List<int>
     );
   }
-
-  Future<void> _persist() async {
-    await _storage.saveAlarms(_alarms);
-  }
-
-  String _generateId() {
-    final rand = Random();
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomPart = rand.nextInt(1 << 32);
-    return '$timestamp-$randomPart';
-  }
-
-  static int _compareTime(Alarm a, Alarm b) {
-    if (a.time.hour != b.time.hour) {
-      return a.time.hour.compareTo(b.time.hour);
-    }
-    return a.time.minute.compareTo(b.time.minute);
-  }
 }
-

@@ -20,43 +20,25 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => context.read<AlarmProvider>().initialize(),
-    );
+    // Alarms are loaded in provider constructor
   }
 
   Future<void> _openNewAlarm(BuildContext context) async {
-    final provider = context.read<AlarmProvider>();
-    final now = TimeOfDay.now();
-    final alarm = provider.createNewForTime(now);
-    final result = await Navigator.of(context).push<Alarm>(
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => EditAlarmScreen(
-          alarm: alarm,
-          isNew: true,
-        ),
+        builder: (_) => const EditAlarmScreen(),
         fullscreenDialog: true,
       ),
     );
-    if (result != null) {
-      await provider.addAlarm(result);
-    }
   }
 
-  Future<void> _editAlarm(BuildContext context, Alarm alarm) async {
-    final provider = context.read<AlarmProvider>();
-    final result = await Navigator.of(context).push<Alarm>(
+  Future<void> _openEditAlarm(BuildContext context, Alarm alarm) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => EditAlarmScreen(
-          alarm: alarm,
-          isNew: false,
-        ),
+        builder: (_) => EditAlarmScreen(alarmId: alarm.id),
         fullscreenDialog: true,
       ),
     );
-    if (result != null) {
-      await provider.updateAlarm(result);
-    }
   }
 
   void _confirmDelete(BuildContext context, Alarm alarm) {
@@ -136,9 +118,8 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                               onToggleChanged: (value) =>
                                   provider.toggleAlarm(
                                 alarm.id,
-                                value,
                               ),
-                              onTap: () => _editAlarm(context, alarm),
+                              onTap: () => _openEditAlarm(context, alarm),
                               onDelete: () => _confirmDelete(context, alarm),
                             );
                           },

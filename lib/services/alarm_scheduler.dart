@@ -1,5 +1,4 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/material.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -33,7 +32,7 @@ class AlarmScheduler {
   }
 
   Future<void> scheduleAlarm(Alarm alarm) async {
-    if (!alarm.isEnabled) return;
+    if (!alarm.enabled) return;
     await initialize();
 
     final id = alarm.id.hashCode & 0x7fffffff;
@@ -70,7 +69,7 @@ class AlarmScheduler {
     if (alarm.isOneTime) {
       await _plugin.zonedSchedule(
         id,
-        alarm.label.isEmpty ? 'Alarm' : alarm.label,
+        'Alarm',
         'It\'s time',
         tzTime,
         details,
@@ -81,7 +80,7 @@ class AlarmScheduler {
     } else {
       await _plugin.zonedSchedule(
         id,
-        alarm.label.isEmpty ? 'Alarm' : alarm.label,
+        'Alarm',
         'It\'s time',
         tzTime,
         details,
@@ -93,16 +92,16 @@ class AlarmScheduler {
     }
   }
 
-  Future<void> cancelAlarm(Alarm alarm) async {
+  Future<void> cancelAlarm(String alarmId) async {
     await initialize();
-    final id = alarm.id.hashCode & 0x7fffffff;
+    final id = alarmId.hashCode & 0x7fffffff;
     await _plugin.cancel(id);
   }
 
   Future<void> rescheduleAll(List<Alarm> alarms) async {
     await initialize();
     await _plugin.cancelAll();
-    for (final alarm in alarms.where((a) => a.isEnabled)) {
+    for (final alarm in alarms.where((a) => a.enabled)) {
       await scheduleAlarm(alarm);
     }
   }
@@ -113,8 +112,11 @@ class AlarmScheduler {
       return from.add(const Duration(days: 1));
     }
 
-    final weekdayToday = from.weekday;
-    final todayMatches = days.contains(weekdayToday);
+    
+    int currentDayIndex = from.weekday;
+    if (currentDayIndex == 7) currentDayIndex = 0; // Sun=0
+
+    final todayMatches = days.contains(currentDayIndex);
 
     DateTime candidate = DateTime(
       from.year,
@@ -130,7 +132,10 @@ class AlarmScheduler {
 
     for (var i = 1; i <= 7; i++) {
       final next = from.add(Duration(days: i));
-      if (days.contains(next.weekday)) {
+      int nextDayIndex = next.weekday;
+      if (nextDayIndex == 7) nextDayIndex = 0;
+      
+      if (days.contains(nextDayIndex)) {
         return DateTime(
           next.year,
           next.month,
@@ -144,4 +149,3 @@ class AlarmScheduler {
     return candidate.add(const Duration(days: 1));
   }
 }
-

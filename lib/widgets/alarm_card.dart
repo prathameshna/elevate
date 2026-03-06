@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-
 import '../models/alarm.dart';
-import '../theme/app_theme.dart';
 
 class AlarmCard extends StatelessWidget {
   const AlarmCard({
@@ -18,12 +16,9 @@ class AlarmCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   String _formattedTime(BuildContext context) {
-    final now = TimeOfDay.now();
     final localizations = MaterialLocalizations.of(context);
-    final reference = DateTime(0, 1, 1, alarm.time.hour, alarm.time.minute);
-    final formatted =
-        localizations.formatTimeOfDay(alarm.time, alwaysUse24HourFormat: false);
-    return formatted;
+    final timeOfDay = TimeOfDay(hour: alarm.time.hour, minute: alarm.time.minute);
+    return localizations.formatTimeOfDay(timeOfDay, alwaysUse24HourFormat: false);
   }
 
   String _timeUntilLabel() {
@@ -41,6 +36,7 @@ class AlarmCard extends StatelessWidget {
     final diff = scheduled.difference(now);
     final hours = diff.inHours;
     final minutes = diff.inMinutes.remainder(60);
+    
     if (hours <= 0 && minutes <= 0) {
       return 'Alarm soon';
     }
@@ -57,68 +53,57 @@ class AlarmCard extends StatelessWidget {
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 150),
-      opacity: alarm.isEnabled ? 1 : 0.6,
+      opacity: alarm.enabled ? 1 : 0.6,
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedScale(
-          duration: const Duration(milliseconds: 120),
-          scale: 1.0,
-          child: Card(
-            margin: EdgeInsets.zero,
-            shape: cardTheme.shape,
-            color: cardTheme.color,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onLongPress: onDelete,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _timeUntilLabel(),
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _formattedTime(context),
-                                style: theme.textTheme.displayMedium?.copyWith(
-                                  letterSpacing: 0.5,
-                                ),
+        child: Card(
+          margin: EdgeInsets.zero,
+          shape: cardTheme.shape,
+          color: cardTheme.color,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onLongPress: onDelete,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _timeUntilLabel(),
+                    style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFFA0A0A0)),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _formattedTime(context),
+                              style: theme.textTheme.displayMedium?.copyWith(
+                                letterSpacing: 0.5,
+                                color: const Color(0xFFF5F5F5),
+                                fontWeight: FontWeight.bold,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                alarm.label.isNotEmpty
-                                    ? alarm.label
-                                    : alarm.frequencyLabel,
-                                style: theme.textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              alarm.frequencyLabel,
+                              style: theme.textTheme.bodyMedium?.copyWith(color: const Color(0xFFA0A0A0)),
+                            ),
+                          ],
                         ),
-                        Switch.adaptive(
-                          value: alarm.isEnabled,
-                          onChanged: onToggleChanged,
-                          activeColor: ElevateTheme.accent,
-                        ),
-                      ],
-                    ),
-                    if (alarm.repeatDays.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        alarm.frequencyLabel,
-                        style: theme.textTheme.bodySmall,
+                      ),
+                      Switch.adaptive(
+                        value: alarm.enabled,
+                        onChanged: onToggleChanged,
+                        activeColor: const Color(0xFF14B8A6),
                       ),
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -127,4 +112,3 @@ class AlarmCard extends StatelessWidget {
     );
   }
 }
-
