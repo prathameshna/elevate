@@ -8,7 +8,7 @@ class Alarm {
   bool isEnabled;
   final Set<int> selectedDays; // 0=Sun, 1=Mon, ..., 6=Sat
 
-  final String? missionId;
+  final List<String> missionIds;
   final String vibrationPattern;
   final int snoozeMinutes;
   final bool alwaysSnooze; 
@@ -26,7 +26,7 @@ class Alarm {
     this.sound = 'default_alarm',
     this.isEnabled = true,
     this.selectedDays = const {},
-    this.missionId,
+    this.missionIds = const [],
     this.vibrationPattern = 'basic',
     this.snoozeMinutes = 5,
     this.alwaysSnooze = true,
@@ -48,7 +48,7 @@ class Alarm {
       'sound': sound,
       'isEnabled': isEnabled,
       'selectedDays': selectedDays.toList(),
-      'missionId': missionId,
+      'missionIds': missionIds,
       'vibrationPattern': vibrationPattern,
       'snoozeMinutes': snoozeMinutes,
       'alwaysSnooze': alwaysSnooze,
@@ -71,7 +71,7 @@ class Alarm {
       sound: json['sound'] as String? ?? 'default_alarm',
       isEnabled: json['isEnabled'] as bool? ?? json['enabled'] as bool? ?? true,
       selectedDays: Set<int>.from(json['selectedDays'] ?? json['repeatDays'] ?? []),
-      missionId: json['missionId'] as String?,
+      missionIds: List<String>.from(json['missionIds'] ?? (json['missionId'] != null ? [json['missionId']] : [])),
       vibrationPattern: json['vibrationPattern'] as String? ?? 'basic',
       snoozeMinutes: json['snoozeMinutes'] as int? ?? 5,
       alwaysSnooze: json['alwaysSnooze'] as bool? ?? true,
@@ -90,7 +90,7 @@ class Alarm {
     String? sound,
     bool? isEnabled,
     Set<int>? selectedDays,
-    String? missionId,
+    List<String>? missionIds,
     String? vibrationPattern,
     int? snoozeMinutes,
     bool? alwaysSnooze,
@@ -107,7 +107,7 @@ class Alarm {
       sound: sound ?? this.sound,
       isEnabled: isEnabled ?? this.isEnabled,
       selectedDays: selectedDays ?? this.selectedDays,
-      missionId: missionId ?? this.missionId,
+      missionIds: missionIds ?? this.missionIds,
       vibrationPattern: vibrationPattern ?? this.vibrationPattern,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
       alwaysSnooze: alwaysSnooze ?? this.alwaysSnooze,
@@ -131,16 +131,14 @@ class Alarm {
 
   String get frequencyLabel {
     if (selectedDays.isEmpty) return 'One-time';
-    if (selectedDays.length == 7) return 'Daily';
+    if (selectedDays.length == 7) return 'Every day';
     if (selectedDays.length == 5 &&
-        !selectedDays.contains(0) &&
-        !selectedDays.contains(6)) return 'Weekdays';
+        selectedDays.containsAll({1, 2, 3, 4, 5})) return 'Weekdays';
     if (selectedDays.length == 2 &&
-        selectedDays.contains(0) &&
-        selectedDays.contains(6)) return 'Weekends';
+        selectedDays.containsAll({0, 6})) return 'Weekends';
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final sortedDays = List<int>.from(selectedDays)..sort();
-    return 'Every ${sortedDays.map((d) => dayNames[d]).join(', ')}';
+    return sortedDays.map((d) => dayNames[d]).join(', ');
   }
 }

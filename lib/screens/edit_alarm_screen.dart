@@ -30,11 +30,11 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   late TimeOfDay _selectedTime;
   late Set<int> _selectedDays;
   late bool _isEnabled;
-  late String _selectedMission;
   late String _selectedSound;
   late String _selectedVibration;
   late int _snoozeMinutes;
   late bool _alwaysSnooze;
+  late List<String> _assignedMissions;
   late bool _enableWakeUpCheck;
   late bool _showMemoAfter;
   late String _memoText;
@@ -59,7 +59,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         _selectedTime = alarm.time;
         _isEnabled = alarm.isEnabled;
         _selectedDays = Set<int>.from(alarm.selectedDays);
-        _selectedMission = alarm.missionId ?? '';
+        _assignedMissions = List<String>.from(alarm.missionIds);
         _selectedSound = alarm.sound;
         _selectedVibration = alarm.vibrationPattern;
         _snoozeMinutes = alarm.snoozeMinutes;
@@ -72,7 +72,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         _selectedTime = TimeOfDay.now();
         _isEnabled = true;
         _selectedDays = {};
-        _selectedMission = '';
+        _assignedMissions = [];
         _selectedSound = 'default_alarm';
         _selectedVibration = 'basic';
         _snoozeMinutes = 5;
@@ -85,7 +85,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       _selectedTime = TimeOfDay.now();
       _isEnabled = true;
       _selectedDays = {};
-      _selectedMission = '';
+      _assignedMissions = [];
       _selectedSound = 'default_alarm';
       _selectedVibration = 'basic';
       _snoozeMinutes = 5;
@@ -130,15 +130,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
     }
   }
 
-  void _openMissionSelection() async {
-    final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const MissionSelectionScreen()),
-    );
-    if (result != null) {
-      setState(() => _selectedMission = result);
-      HapticFeedback.selectionClick();
-    }
-  }
 
   void _openSoundSelection() async {
     final result = await Navigator.of(context).push<String>(
@@ -192,7 +183,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         sound: _selectedSound,
         isEnabled: _isEnabled,
         selectedDays: _selectedDays,
-        missionId: _selectedMission.isNotEmpty ? _selectedMission : null,
+        missionIds: _assignedMissions,
         vibrationPattern: _selectedVibration,
         snoozeMinutes: _snoozeMinutes,
         alwaysSnooze: _alwaysSnooze,
@@ -307,28 +298,45 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // --- MISSION CARD (Redesigned & Responsive) ---
-                  if (_selectedMission.isNotEmpty) ...[
-                    _buildSectionLabel('Mission Settings'),
-                    const SizedBox(height: 12),
-                    MissionCard(
-                      mission: Mission(
-                        id: _selectedMission,
-                        name: 'Wake-up mission',
-                        description: 'Daily mission',
-                        selectedDays: _selectedDays,
-                        enableWakeUpCheck: _enableWakeUpCheck,
-                      ),
-                      onMissionUpdated: (updatedMission) {
-                        if (!mounted) return;
-                        setState(() {
-                          _selectedDays = updatedMission.selectedDays;
-                          _enableWakeUpCheck = updatedMission.enableWakeUpCheck;
-                        });
-                      },
+                  // --- MISSION section label ---
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20, bottom: 8, left: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 12,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF14B8A6),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const Text(
+                          'MISSION',
+                          style: TextStyle(
+                            color: Color(0xFFA0A0A0),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                  ],
+                  ),
+
+                  // --- Mission card ---
+                  MissionCard(
+                    assignedMissions: _assignedMissions,
+                    wakeUpCheckEnabled: _enableWakeUpCheck,
+                    onMissionsChanged: (missions) {
+                      setState(() => _assignedMissions = missions);
+                    },
+                    onWakeUpCheckChanged: (value) {
+                      setState(() => _enableWakeUpCheck = value);
+                    },
+                  ),
+                  const SizedBox(height: 24),
 
                   // --- SETTINGS SECTION ---
                   _buildSectionLabel('Settings'),
