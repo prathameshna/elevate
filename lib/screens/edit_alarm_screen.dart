@@ -91,32 +91,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
     super.dispose();
   }
 
-  String _getTimeUntilAlarm() {
-    final now = DateTime.now();
-    var alarmDateTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      _selectedTime.hour,
-      _selectedTime.minute,
-    );
-
-    if (alarmDateTime.isBefore(now)) {
-      alarmDateTime = alarmDateTime.add(const Duration(days: 1));
-    }
-
-    final diff = alarmDateTime.difference(now);
-    final hours = diff.inHours;
-    final minutes = diff.inMinutes % 60;
-
-    if (hours == 0) {
-      return 'Alarm in $minutes minute${minutes != 1 ? 's' : ''}';
-    } else if (minutes == 0) {
-      return 'Alarm in $hours hour${hours != 1 ? 's' : ''}';
-    } else {
-      return 'Alarm in $hours hour${hours != 1 ? 's' : ''} $minutes minute${minutes != 1 ? 's' : ''}';
-    }
-  }
 
   Future<void> _pickTime() async {
     final TimeOfDay? picked = await showTimePicker(
@@ -398,7 +372,12 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
   Widget _buildProfessionalHeader(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8, bottom: 12, left: 8, right: 16),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        bottom: 12,
+        left: 8,
+        right: 16,
+      ),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
@@ -416,31 +395,26 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFFF5F5F5), size: 24),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFFF5F5F5),
+              size: 20,
+            ),
             onPressed: () => Navigator.of(context).pop(),
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           ),
           const SizedBox(width: 4),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _isEditMode ? 'Edit alarm' : 'Create alarm',
-                  style: const TextStyle(
+                  'Edit alarm',
+                  style: TextStyle(
                     color: Color(0xFFF5F5F5),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _getTimeUntilAlarm(),
-                  style: const TextStyle(
-                    color: Color(0xFFA0A0A0),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
