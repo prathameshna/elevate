@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/alarm.dart';
 import '../providers/alarm_provider.dart';
+import '../services/alarm_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/alarm_card.dart';
 import '../widgets/expandable_fab.dart';
@@ -115,10 +116,24 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                             final alarm = provider.alarms[index];
                             return AlarmCard(
                               alarm: alarm,
-                              onToggleChanged: (value) =>
-                                  provider.toggleAlarm(
-                                alarm.id,
-                              ),
+                              onToggleChanged: (newValue) async {
+                                // Step 1 — update UI immediately
+                                setState(() {
+                                  alarm.isEnabled = newValue;
+                                });
+
+                                // Step 2 — persist to storage
+                                await AlarmService.instance.updateAlarm(
+                                  alarm.copyWith(isEnabled: newValue),
+                                );
+
+                                // Step 3 — schedule or cancel native alarm
+                                if (newValue) {
+                                  await AlarmService.instance.scheduleAlarm(alarm);
+                                } else {
+                                  await AlarmService.instance.cancelAlarm(alarm.id);
+                                }
+                              },
                               onTap: () => _openEditAlarm(context, alarm),
                               onDelete: () => _confirmDelete(context, alarm),
                             );

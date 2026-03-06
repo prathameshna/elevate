@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 
 class Alarm {
   final String id;
-  final DateTime time;
+  final TimeOfDay time;
   final String label;
   final String sound;
-  final bool enabled;
-  final List<int> repeatDays; // 0=Sun, 1=Mon, ..., 6=Sat
+  bool isEnabled;
+  final Set<int> selectedDays; // 0=Sun, 1=Mon, ..., 6=Sat
 
   final String? missionId;
   final String vibrationPattern;
   final int snoozeMinutes;
-  final bool alwaysSnooze; // Not explicitly in practical but useful
+  final bool alwaysSnooze; 
   final bool enableWakeUpCheck;
   final bool showMemoAfter;
   final String? memoText;
@@ -22,10 +22,10 @@ class Alarm {
   Alarm({
     required this.id,
     required this.time,
-    required this.label,
-    required this.sound,
-    required this.enabled,
-    required this.repeatDays,
+    this.label = '',
+    this.sound = 'default_alarm',
+    this.isEnabled = true,
+    this.selectedDays = const {},
     this.missionId,
     this.vibrationPattern = 'basic',
     this.snoozeMinutes = 5,
@@ -37,17 +37,17 @@ class Alarm {
     this.vibration = true,
   });
 
-  bool get isOneTime => repeatDays.isEmpty;
-  bool get isEnabled => enabled;
+  bool get isOneTime => selectedDays.isEmpty;
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'time': time.toIso8601String(),
+      'timeHour': time.hour,
+      'timeMinute': time.minute,
       'label': label,
       'sound': sound,
-      'enabled': enabled,
-      'repeatDays': repeatDays,
+      'isEnabled': isEnabled,
+      'selectedDays': selectedDays.toList(),
       'missionId': missionId,
       'vibrationPattern': vibrationPattern,
       'snoozeMinutes': snoozeMinutes,
@@ -63,11 +63,14 @@ class Alarm {
   factory Alarm.fromJson(Map<String, dynamic> json) {
     return Alarm(
       id: json['id'] as String,
-      time: DateTime.parse(json['time'] as String),
+      time: TimeOfDay(
+        hour: json['timeHour'] as int,
+        minute: json['timeMinute'] as int,
+      ),
       label: json['label'] as String? ?? '',
       sound: json['sound'] as String? ?? 'default_alarm',
-      enabled: json['enabled'] as bool? ?? true,
-      repeatDays: List<int>.from(json['repeatDays'] ?? []),
+      isEnabled: json['isEnabled'] as bool? ?? json['enabled'] as bool? ?? true,
+      selectedDays: Set<int>.from(json['selectedDays'] ?? json['repeatDays'] ?? []),
       missionId: json['missionId'] as String?,
       vibrationPattern: json['vibrationPattern'] as String? ?? 'basic',
       snoozeMinutes: json['snoozeMinutes'] as int? ?? 5,
@@ -82,11 +85,11 @@ class Alarm {
 
   Alarm copyWith({
     String? id,
-    DateTime? time,
+    TimeOfDay? time,
     String? label,
     String? sound,
-    bool? enabled,
-    List<int>? repeatDays,
+    bool? isEnabled,
+    Set<int>? selectedDays,
     String? missionId,
     String? vibrationPattern,
     int? snoozeMinutes,
@@ -102,8 +105,8 @@ class Alarm {
       time: time ?? this.time,
       label: label ?? this.label,
       sound: sound ?? this.sound,
-      enabled: enabled ?? this.enabled,
-      repeatDays: repeatDays ?? this.repeatDays,
+      isEnabled: isEnabled ?? this.isEnabled,
+      selectedDays: selectedDays ?? this.selectedDays,
       missionId: missionId ?? this.missionId,
       vibrationPattern: vibrationPattern ?? this.vibrationPattern,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
@@ -127,17 +130,17 @@ class Alarm {
   int get hashCode => id.hashCode;
 
   String get frequencyLabel {
-    if (repeatDays.isEmpty) return 'One-time';
-    if (repeatDays.length == 7) return 'Daily';
-    if (repeatDays.length == 5 &&
-        !repeatDays.contains(0) &&
-        !repeatDays.contains(6)) return 'Weekdays';
-    if (repeatDays.length == 2 &&
-        repeatDays.contains(0) &&
-        repeatDays.contains(6)) return 'Weekends';
+    if (selectedDays.isEmpty) return 'One-time';
+    if (selectedDays.length == 7) return 'Daily';
+    if (selectedDays.length == 5 &&
+        !selectedDays.contains(0) &&
+        !selectedDays.contains(6)) return 'Weekdays';
+    if (selectedDays.length == 2 &&
+        selectedDays.contains(0) &&
+        selectedDays.contains(6)) return 'Weekends';
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    final sortedDays = List<int>.from(repeatDays)..sort();
+    final sortedDays = List<int>.from(selectedDays)..sort();
     return 'Every ${sortedDays.map((d) => dayNames[d]).join(', ')}';
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/alarm.dart';
+import 'alarm_toggle.dart';
 
 class AlarmCard extends StatelessWidget {
   const AlarmCard({
@@ -17,8 +18,7 @@ class AlarmCard extends StatelessWidget {
 
   String _formattedTime(BuildContext context) {
     final localizations = MaterialLocalizations.of(context);
-    final timeOfDay = TimeOfDay(hour: alarm.time.hour, minute: alarm.time.minute);
-    return localizations.formatTimeOfDay(timeOfDay, alwaysUse24HourFormat: false);
+    return localizations.formatTimeOfDay(alarm.time, alwaysUse24HourFormat: false);
   }
 
   String _timeUntilLabel() {
@@ -53,7 +53,7 @@ class AlarmCard extends StatelessWidget {
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 150),
-      opacity: alarm.enabled ? 1 : 0.6,
+      opacity: alarm.isEnabled ? 1 : 0.6,
       child: GestureDetector(
         onTap: onTap,
         child: Card(
@@ -96,10 +96,9 @@ class AlarmCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Switch.adaptive(
-                        value: alarm.enabled,
+                      AlarmToggle(
+                        value: alarm.isEnabled,
                         onChanged: onToggleChanged,
-                        activeColor: const Color(0xFF14B8A6),
                       ),
                     ],
                   ),

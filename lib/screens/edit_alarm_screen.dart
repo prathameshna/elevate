@@ -27,7 +27,8 @@ class EditAlarmScreen extends StatefulWidget {
 class _EditAlarmScreenState extends State<EditAlarmScreen> {
   // === STATE VARIABLES ===
   late TimeOfDay _selectedTime;
-  late List<int> _selectedDays;
+  late Set<int> _selectedDays;
+  late bool _isEnabled;
   late String _selectedMission;
   late String _selectedSound;
   late String _selectedVibration;
@@ -54,8 +55,9 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
     if (_isEditMode) {
       final alarm = provider.alarms.firstWhere((a) => a.id == widget.alarmId);
-      _selectedTime = TimeOfDay(hour: alarm.time.hour, minute: alarm.time.minute);
-      _selectedDays = List<int>.from(alarm.repeatDays);
+      _selectedTime = alarm.time;
+      _isEnabled = alarm.isEnabled;
+      _selectedDays = Set<int>.from(alarm.selectedDays);
       _selectedMission = alarm.missionId ?? '';
       _selectedSound = alarm.sound;
       _selectedVibration = alarm.vibrationPattern;
@@ -66,7 +68,8 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       _memoText = alarm.memoText ?? '';
     } else {
       _selectedTime = TimeOfDay.now();
-      _selectedDays = [];
+      _isEnabled = true;
+      _selectedDays = {};
       _selectedMission = '';
       _selectedSound = 'default_alarm';
       _selectedVibration = 'basic';
@@ -214,11 +217,11 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
       final alarm = Alarm(
         id: _isEditMode ? widget.alarmId! : DateTime.now().millisecondsSinceEpoch.toString(),
-        time: alarmTime,
+        time: _selectedTime,
         label: '',
         sound: _selectedSound,
-        enabled: true,
-        repeatDays: _selectedDays,
+        isEnabled: _isEnabled,
+        selectedDays: _selectedDays,
         missionId: _selectedMission.isNotEmpty ? _selectedMission : null,
         vibrationPattern: _selectedVibration,
         snoozeMinutes: _snoozeMinutes,

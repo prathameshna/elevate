@@ -92,11 +92,11 @@ class AlarmProvider extends ChangeNotifier {
     final index = _alarms.indexWhere((a) => a.id == id);
     if (index != -1) {
       final alarm = _alarms[index];
-      final updated = alarm.copyWith(enabled: !alarm.enabled);
+      final updated = alarm.copyWith(isEnabled: !alarm.isEnabled);
       _alarms[index] = updated;
       await _saveAlarms();
       
-      if (updated.enabled) {
+      if (updated.isEnabled) {
         await AlarmScheduler.instance.scheduleAlarm(updated);
       } else {
         await AlarmScheduler.instance.cancelAlarm(updated.id);
@@ -107,21 +107,13 @@ class AlarmProvider extends ChangeNotifier {
   }
 
   Alarm createNewForTime(TimeOfDay time) {
-    final now = DateTime.now();
-    final alarmTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      time.hour,
-      time.minute,
-    );
     return Alarm(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      time: alarmTime,
+      time: time,
       label: '',
       sound: 'default_alarm',
-      enabled: true,
-      repeatDays: [], // Practical spec uses List<int>
+      isEnabled: true,
+      selectedDays: {}, 
     );
   }
 }

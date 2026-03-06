@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/alarm_provider.dart';
+import 'services/alarm_service.dart';
 import 'screens/alarm_list_screen.dart';
 import 'screens/shell_screens.dart';
 import 'theme/app_theme.dart';
@@ -28,6 +29,8 @@ class ElevateApp extends StatelessWidget {
       ],
       child: Builder(
         builder: (context) {
+          final alarmProvider = Provider.of<AlarmProvider>(context, listen: false);
+          AlarmService.instance.init(alarmProvider);
           return MaterialApp(
             title: 'Elevate',
             debugShowCheckedModeBanner: false,

@@ -4,8 +4,8 @@ import 'daily_pill_toggle.dart';
 import 'day_button.dart';
 
 class DaySelectorWidget extends StatefulWidget {
-  final List<int> selectedDays;
-  final Function(List<int>) onDaysChanged;
+  final Set<int> selectedDays;
+  final Function(Set<int>) onDaysChanged;
 
   const DaySelectorWidget({
     super.key,
@@ -50,17 +50,17 @@ class _DaySelectorWidgetState extends State<DaySelectorWidget> {
     
     if (newValue) {
       // RECOMMENDED FIX: Select all 7 days instantly in the data
-      widget.onDaysChanged([0, 1, 2, 3, 4, 5, 6]);
+      widget.onDaysChanged({0, 1, 2, 3, 4, 5, 6});
       
       // OPTIONAL: Run purely visual staggered animation on local state
       // (The days will light up because widget.selectedDays is now full)
     } else {
-      widget.onDaysChanged([]);
+      widget.onDaysChanged({});
     }
   }
 
   void _onDayTapped(int index) {
-    final updated = List<int>.from(widget.selectedDays);
+    final updated = Set<int>.from(widget.selectedDays);
     if (updated.contains(index)) {
       updated.remove(index);
     } else {

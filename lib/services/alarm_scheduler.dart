@@ -32,7 +32,7 @@ class AlarmScheduler {
   }
 
   Future<void> scheduleAlarm(Alarm alarm) async {
-    if (!alarm.enabled) return;
+    if (!alarm.isEnabled) return;
     await initialize();
 
     final id = alarm.id.hashCode & 0x7fffffff;
@@ -46,7 +46,7 @@ class AlarmScheduler {
       alarm.time.minute,
     );
 
-    if (!alarm.isOneTime && alarm.repeatDays.isNotEmpty) {
+    if (!alarm.isOneTime && alarm.selectedDays.isNotEmpty) {
       nextTime = _nextForRepeatDays(alarm, now);
     } else if (!nextTime.isAfter(now)) {
       nextTime = nextTime.add(const Duration(days: 1));
@@ -101,13 +101,13 @@ class AlarmScheduler {
   Future<void> rescheduleAll(List<Alarm> alarms) async {
     await initialize();
     await _plugin.cancelAll();
-    for (final alarm in alarms.where((a) => a.enabled)) {
+    for (final alarm in alarms.where((a) => a.isEnabled)) {
       await scheduleAlarm(alarm);
     }
   }
 
   DateTime _nextForRepeatDays(Alarm alarm, DateTime from) {
-    final days = alarm.repeatDays;
+    final days = alarm.selectedDays;
     if (days.isEmpty) {
       return from.add(const Duration(days: 1));
     }

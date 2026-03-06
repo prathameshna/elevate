@@ -2,7 +2,7 @@ class Mission {
   final String id;
   final String name;
   final String description;
-  final List<int> selectedDays;
+  final Set<int> selectedDays;
   final bool enableWakeUpCheck;
   final int completedSlots;
   final int maxSlots;
@@ -21,7 +21,7 @@ class Mission {
     String? id,
     String? name,
     String? description,
-    List<int>? selectedDays,
+    Set<int>? selectedDays,
     bool? enableWakeUpCheck,
     int? completedSlots,
     int? maxSlots,

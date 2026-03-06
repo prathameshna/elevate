@@ -18,7 +18,7 @@ class MissionCard extends StatefulWidget {
 
 class _MissionCardState extends State<MissionCard>
     with SingleTickerProviderStateMixin {
-  late List<int> _selectedDays;
+  late Set<int> _selectedDays;
   late bool _wakeUpCheckEnabled;
   late AnimationController _containerController;
   late Animation<double> _fadeAnimation;
@@ -27,7 +27,7 @@ class _MissionCardState extends State<MissionCard>
   @override
   void initState() {
     super.initState();
-    _selectedDays = List.from(widget.mission.selectedDays);
+    _selectedDays = Set<int>.from(widget.mission.selectedDays);
     _wakeUpCheckEnabled = widget.mission.enableWakeUpCheck;
 
     _containerController = AnimationController(
@@ -52,7 +52,7 @@ class _MissionCardState extends State<MissionCard>
     super.dispose();
   }
 
-  void _handleDaysSelected(List<int> days) {
+  void _handleDaysSelected(Set<int> days) {
     if (!mounted) return;
     setState(() => _selectedDays = days);
     final updatedMission = widget.mission.copyWith(
@@ -275,13 +275,13 @@ class _MissionCardState extends State<MissionCard>
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        List<int> newDays;
+        Set<int> newDays;
         if (label == 'Daily') {
-          newDays = [0, 1, 2, 3, 4, 5, 6];
+          newDays = {0, 1, 2, 3, 4, 5, 6};
         } else if (label == 'Weekdays') {
-          newDays = [1, 2, 3, 4, 5];
+          newDays = {1, 2, 3, 4, 5};
         } else {
-          newDays = [0, 6];
+          newDays = {0, 6};
         }
         _handleDaysSelected(newDays);
       },
@@ -319,7 +319,7 @@ class _MissionCardState extends State<MissionCard>
             final isSelected = _selectedDays.contains(index);
             return GestureDetector(
               onTap: () {
-                final newDays = List<int>.from(_selectedDays);
+                final newDays = Set<int>.from(_selectedDays);
                 if (newDays.contains(index)) {
                   newDays.remove(index);
                 } else {
