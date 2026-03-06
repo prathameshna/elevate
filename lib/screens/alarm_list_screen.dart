@@ -44,23 +44,55 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
   }
 
   Future<void> _openNewAlarm(BuildContext context) async {
-    final result = await Navigator.of(context).push<Alarm>(
-      MaterialPageRoute(
-        builder: (_) => const EditAlarmScreen(),
-        fullscreenDialog: true,
-      ),
+    final result = await Navigator.push<Alarm>(
+      context,
+      _smoothSlideRoute(const EditAlarmScreen()),
     );
-    if (result != null) _refreshAlarms();
+    if (result != null && mounted) _refreshAlarms();
   }
 
   Future<void> _openEditAlarm(BuildContext context, Alarm alarm) async {
-    final result = await Navigator.of(context).push<Alarm>(
-      MaterialPageRoute(
-        builder: (_) => EditAlarmScreen(alarmId: alarm.id),
-        fullscreenDialog: true,
-      ),
+    final result = await Navigator.push<Alarm>(
+      context,
+      _smoothSlideRoute(EditAlarmScreen(alarmId: alarm.id)),
     );
-    if (result != null) _refreshAlarms();
+    if (result != null && mounted) _refreshAlarms();
+  }
+
+  PageRouteBuilder<T> _smoothSlideRoute<T>(Widget page) {
+    return PageRouteBuilder<T>(
+      transitionDuration: const Duration(milliseconds: 380),
+      reverseTransitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (_, animation, __) => page,
+      transitionsBuilder: (_, animation, __, child) {
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.08),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        ));
+
+        final fade = Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0.0, 0.65, curve: Curves.easeOut),
+          ),
+        );
+
+        final scale = Tween<double>(begin: 0.97, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        );
+
+        return FadeTransition(
+          opacity: fade,
+          child: ScaleTransition(
+            scale: scale,
+            child: SlideTransition(position: slide, child: child),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _confirmDelete(BuildContext context, Alarm alarm) async {
@@ -144,7 +176,7 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                             final alarm = _alarms[index];
                             return AlarmCard(
                               alarm: alarm,
-                              onToggleChanged: (newValue) => _toggleAlarm(alarm.id, newValue),
+                              onToggle: (newValue) => _toggleAlarm(alarm.id, newValue),
                               onTap: () => _openEditAlarm(context, alarm),
                               onDelete: () => _confirmDelete(context, alarm),
                             );

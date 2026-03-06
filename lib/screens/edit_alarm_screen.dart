@@ -52,21 +52,35 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
   void _initializeState() {
     _isEditMode = widget.alarmId != null;
-    final provider = context.read<AlarmProvider>();
 
     if (_isEditMode) {
-      final alarm = provider.alarms.firstWhere((a) => a.id == widget.alarmId);
-      _selectedTime = alarm.time;
-      _isEnabled = alarm.isEnabled;
-      _selectedDays = Set<int>.from(alarm.selectedDays);
-      _selectedMission = alarm.missionId ?? '';
-      _selectedSound = alarm.sound;
-      _selectedVibration = alarm.vibrationPattern;
-      _snoozeMinutes = alarm.snoozeMinutes;
-      _alwaysSnooze = alarm.alwaysSnooze;
-      _enableWakeUpCheck = alarm.enableWakeUpCheck;
-      _showMemoAfter = alarm.showMemoAfter;
-      _memoText = alarm.memoText ?? '';
+      try {
+        final alarm = AlarmService.instance.alarms.firstWhere((a) => a.id == widget.alarmId);
+        _selectedTime = alarm.time;
+        _isEnabled = alarm.isEnabled;
+        _selectedDays = Set<int>.from(alarm.selectedDays);
+        _selectedMission = alarm.missionId ?? '';
+        _selectedSound = alarm.sound;
+        _selectedVibration = alarm.vibrationPattern;
+        _snoozeMinutes = alarm.snoozeMinutes;
+        _alwaysSnooze = alarm.alwaysSnooze;
+        _enableWakeUpCheck = alarm.enableWakeUpCheck;
+        _showMemoAfter = alarm.showMemoAfter;
+        _memoText = alarm.memoText ?? '';
+      } catch (e) {
+        // Fallback if alarm not found
+        _selectedTime = TimeOfDay.now();
+        _isEnabled = true;
+        _selectedDays = {};
+        _selectedMission = '';
+        _selectedSound = 'default_alarm';
+        _selectedVibration = 'basic';
+        _snoozeMinutes = 5;
+        _alwaysSnooze = true;
+        _enableWakeUpCheck = false;
+        _showMemoAfter = false;
+        _memoText = '';
+      }
     } else {
       _selectedTime = TimeOfDay.now();
       _isEnabled = true;
