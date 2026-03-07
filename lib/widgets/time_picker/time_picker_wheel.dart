@@ -16,27 +16,56 @@ class TimePickerWheel extends StatefulWidget {
 }
 
 class _TimePickerWheelState extends State<TimePickerWheel> {
+
+  // ── Looping constants ──────────────────────────────────────
+  static const int _hourLoopCount   = 12 * 500;  // 6,000
+  static const int _minuteLoopCount = 60 * 500;  // 30,000
+  static const int _hourMiddle      = 12 * 250;  // 3,000
+  static const int _minuteMiddle    = 60 * 250;  // 15,000
+
+  // ── Controllers ───────────────────────────────────────────
   late FixedExtentScrollController _hourController;
   late FixedExtentScrollController _minuteController;
   late FixedExtentScrollController _amPmController;
 
-  late int _selectedHour;   // 1–12
-  late int _selectedMinute; // 0–59
+  // ── State ─────────────────────────────────────────────────
+  late int  _selectedHour;   // 1–12
+  late int  _selectedMinute; // 0–59
   late bool _isAM;
+
+  // ── Modulo helpers ────────────────────────────────────────
+
+  /// Converts a large looping index → real hour value (1–12)
+  int _hourFromIndex(int index) {
+    final mod = index % 12;
+    return mod == 0 ? 12 : mod; // 0 mod edge case → show 12
+  }
+
+  /// Converts a large looping index → real minute value (0–59)
+  int _minuteFromIndex(int index) => index % 60;
+
+  String _formatHour(int index)   =>
+      _hourFromIndex(index).toString().padLeft(2, '0');
+
+  String _formatMinute(int index) =>
+      _minuteFromIndex(index).toString().padLeft(2, '0');
+
+  // ── Init ──────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
     final h = widget.initialTime.hour;
-    _isAM = h < 12;
+    _isAM         = h < 12;
     _selectedHour = h % 12 == 0 ? 12 : h % 12;
     _selectedMinute = widget.initialTime.minute;
 
+    // Start in the MIDDLE of each large list + offset to real value
     _hourController = FixedExtentScrollController(
-      initialItem: _selectedHour - 1,
+      initialItem: _hourMiddle + (_selectedHour - 1),
     );
     _minuteController = FixedExtentScrollController(
-      initialItem: _selectedMinute,
+      initialItem: _minuteMiddle + _selectedMinute,
     );
     _amPmController = FixedExtentScrollController(
       initialItem: _isAM ? 0 : 1,
@@ -51,22 +80,24 @@ class _TimePickerWheelState extends State<TimePickerWheel> {
     super.dispose();
   }
 
+  // ── Notify parent with correct 24hr time ──────────────────
+
   void _notifyParent() {
     final hour24 = _isAM
-        ? (_selectedHour == 12 ? 0 : _selectedHour)
+        ? (_selectedHour == 12 ? 0  : _selectedHour)
         : (_selectedHour == 12 ? 12 : _selectedHour + 12);
     widget.onTimeChanged(
       TimeOfDay(hour: hour24, minute: _selectedMinute),
     );
   }
 
-  // ── Selection highlight overlay ──────────────────────────
+  // ── UI Helpers ────────────────────────────────────────────
 
-  Widget _selectionHighlight(double width) {
+  Widget _selectionHighlight(double totalWidth) {
     return IgnorePointer(
       child: Center(
         child: Container(
-          width: width,
+          width: totalWidth,
           height: 46,
           decoration: BoxDecoration(
             color: const Color(0xFF1A2E2C),
@@ -81,101 +112,25 @@ class _TimePickerWheelState extends State<TimePickerWheel> {
     );
   }
 
-  // ── Top/bottom fade overlay ───────────────────────────────
-
   Widget _fadeOverlay() {
     return IgnorePointer(
-      child: ShaderMask(
-        shaderCallback: (bounds) => const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF1A1A1A),
-            Colors.transparent,
-            Colors.transparent,
-            Color(0xFF1A1A1A),
-          ],
-          stops: [0.0, 0.28, 0.72, 1.0],
-        ).createShader(bounds),
-        blendMode: BlendMode.dstIn,
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A1A1A), Colors.transparent,
-                       Colors.transparent, Color(0xFF1A1A1A)],
-              stops: [0.0, 0.28, 0.72, 1.0],
-            ),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A1A1A),
+              Colors.transparent,
+              Colors.transparent,
+              Color(0xFF1A1A1A),
+            ],
+            stops: [0.0, 0.28, 0.72, 1.0],
           ),
         ),
       ),
     );
   }
-
-  // ── Single wheel column ───────────────────────────────────
-
-  Widget _buildWheel({
-    required FixedExtentScrollController controller,
-    required int itemCount,
-    required String Function(int) labelBuilder,
-    required int selectedIndex,
-    required ValueChanged<int> onChanged,
-    double width = 76,
-    double fontSize = 34,
-    bool isAmPm = false,
-  }) {
-    return SizedBox(
-      width: width,
-      height: 200,
-      child: Stack(
-        children: [
-          // The wheel
-          ListWheelScrollView.useDelegate(
-            controller: controller,
-            itemExtent: 46,
-            diameterRatio: 2.2,
-            perspective: 0.002,
-            physics: const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (index) {
-              HapticFeedback.selectionClick();
-              onChanged(index);
-            },
-            childDelegate: ListWheelChildBuilderDelegate(
-              childCount: itemCount,
-              builder: (context, index) {
-                final isSelected = index == selectedIndex;
-                return Center(
-                  child: Text(
-                    labelBuilder(index),
-                    style: TextStyle(
-                      fontSize: isSelected
-                          ? (isAmPm ? 18 : fontSize)
-                          : (isAmPm ? 14 : fontSize - 6),
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w300,
-                      color: isSelected
-                          ? const Color(0xFFF5F5F5)
-                          : const Color(0xFFF5F5F5).withOpacity(0.28),
-                      fontFeatures: isAmPm
-                          ? null
-                          : const [FontFeature.tabularFigures()],
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // Fade overlay on top
-          _fadeOverlay(),
-        ],
-      ),
-    );
-  }
-
-  // ── Fixed colon separator ─────────────────────────────────
 
   Widget _colon() {
     return Padding(
@@ -192,56 +147,116 @@ class _TimePickerWheelState extends State<TimePickerWheel> {
     );
   }
 
+  // ── Core wheel builder ────────────────────────────────────
+
+  Widget _buildWheel({
+    required FixedExtentScrollController controller,
+    required int itemCount,
+    required String Function(int) labelBuilder,
+    required bool Function(int) isSelectedCheck, // value-based, not index-based
+    required ValueChanged<int> onChanged,
+    double width = 76,
+    bool isAmPm = false,
+  }) {
+    return SizedBox(
+      width: width,
+      height: 200,
+      child: Stack(
+        children: [
+          ListWheelScrollView.useDelegate(
+            controller: controller,
+            itemExtent: 46,
+            diameterRatio: 2.2,
+            perspective: 0.002,
+            physics: const FixedExtentScrollPhysics(),
+            onSelectedItemChanged: (index) {
+              HapticFeedback.selectionClick();
+              onChanged(index);
+            },
+            childDelegate: ListWheelChildBuilderDelegate(
+              childCount: itemCount,
+              builder: (context, index) {
+                final isSelected = isSelectedCheck(index);
+                return Center(
+                  child: Text(
+                    labelBuilder(index),
+                    style: TextStyle(
+                      fontSize: isSelected
+                          ? (isAmPm ? 18 : 34)
+                          : (isAmPm ? 14 : 28),
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w300,
+                      color: isSelected
+                          ? const Color(0xFFF5F5F5)
+                          : const Color(0xFFF5F5F5).withOpacity(0.28),
+                      fontFeatures: isAmPm
+                          ? null
+                          : const [FontFeature.tabularFigures()],
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Fade overlay — must be LAST in Stack so it renders on top
+          _fadeOverlay(),
+        ],
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Responsive wheel widths
-        final availableWidth = constraints.maxWidth;
-        final hourWidth   = (availableWidth * 0.26).clamp(64.0, 88.0);
-        final minuteWidth = (availableWidth * 0.26).clamp(64.0, 88.0);
-        final amPmWidth   = (availableWidth * 0.18).clamp(44.0, 60.0);
-        final totalWheelWidth = hourWidth + minuteWidth + amPmWidth + 40;
+        final hourWidth   = (constraints.maxWidth * 0.26).clamp(64.0, 88.0);
+        final minuteWidth = (constraints.maxWidth * 0.26).clamp(64.0, 88.0);
+        final amPmWidth   = (constraints.maxWidth * 0.18).clamp(44.0, 60.0);
+        final highlightWidth = hourWidth + minuteWidth + amPmWidth + 48;
 
         return SizedBox(
           height: 200,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Selection highlight behind all wheels
-              _selectionHighlight(totalWheelWidth),
+              // Teal selection card behind wheels
+              _selectionHighlight(highlightWidth),
 
               // Wheels row
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Hour wheel: 01–12
+
+                  // ── Hour wheel (looping 1–12) ──
                   _buildWheel(
                     controller: _hourController,
-                    itemCount: 12,
-                    labelBuilder: (i) => (i + 1).toString().padLeft(2, '0'),
-                    selectedIndex: _selectedHour - 1,
+                    itemCount: _hourLoopCount,
+                    labelBuilder: _formatHour,
+                    isSelectedCheck: (i) =>
+                        _hourFromIndex(i) == _selectedHour,
                     onChanged: (i) {
-                      setState(() => _selectedHour = i + 1);
+                      setState(() => _selectedHour = _hourFromIndex(i));
                       _notifyParent();
                     },
                     width: hourWidth,
                   ),
 
-                  // Fixed colon
                   _colon(),
 
-                  // Minute wheel: 00–59
+                  // ── Minute wheel (looping 0–59) ──
                   _buildWheel(
                     controller: _minuteController,
-                    itemCount: 60,
-                    labelBuilder: (i) => i.toString().padLeft(2, '0'),
-                    selectedIndex: _selectedMinute,
+                    itemCount: _minuteLoopCount,
+                    labelBuilder: _formatMinute,
+                    isSelectedCheck: (i) =>
+                        _minuteFromIndex(i) == _selectedMinute,
                     onChanged: (i) {
-                      setState(() => _selectedMinute = i);
+                      setState(() => _selectedMinute = _minuteFromIndex(i));
                       _notifyParent();
                     },
                     width: minuteWidth,
@@ -249,12 +264,12 @@ class _TimePickerWheelState extends State<TimePickerWheel> {
 
                   const SizedBox(width: 8),
 
-                  // AM/PM wheel
+                  // ── AM/PM wheel (no loop — only 2 items) ──
                   _buildWheel(
                     controller: _amPmController,
                     itemCount: 2,
                     labelBuilder: (i) => i == 0 ? 'a.m.' : 'p.m.',
-                    selectedIndex: _isAM ? 0 : 1,
+                    isSelectedCheck: (i) => (_isAM ? 0 : 1) == i,
                     onChanged: (i) {
                       setState(() => _isAM = i == 0);
                       _notifyParent();

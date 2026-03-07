@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/mission_type.dart';
+import 'mission_picker_sheet.dart';
 
 class MissionCard extends StatefulWidget {
-  final List<String> assignedMissions;
+  final List<MissionType> assignedMissions;
   final bool wakeUpCheckEnabled;
-  final ValueChanged<List<String>> onMissionsChanged;
+  final ValueChanged<List<MissionType>> onMissionsChanged;
   final ValueChanged<bool> onWakeUpCheckChanged;
 
   const MissionCard({
@@ -20,31 +22,57 @@ class MissionCard extends StatefulWidget {
 }
 
 class _MissionCardState extends State<MissionCard> {
-  late List<String> _localMissions;
+  late List<MissionType?> _assignedMissions;
   late bool _localWakeUpCheck;
 
   @override
   void initState() {
     super.initState();
-    _localMissions = List<String>.from(widget.assignedMissions);
+    _assignedMissions = List<MissionType?>.from(widget.assignedMissions);
     // Ensure we have at least 4 slots for UI rendering
-    while (_localMissions.length < 4) {
-      _localMissions.add('');
+    while (_assignedMissions.length < 4) {
+      _assignedMissions.add(null);
     }
     _localWakeUpCheck = widget.wakeUpCheckEnabled;
   }
 
-  void _onMissionSlotTapped(int index) {
+  void _onMissionSlotTapped(int slotIndex) async {
     HapticFeedback.lightImpact();
+
+    // Open mission picker bottom sheet
+    final MissionType? selected = await showModalBottomSheet<MissionType>(
+      context: context,
+      isScrollControlled: true, // full height
+      backgroundColor: Colors.transparent,
+      builder: (_) => MissionPickerSheet(
+        alreadySelected: _assignedMissions
+            .where((m) => m != null)
+            .cast<MissionType>()
+            .toList(),
+      ),
+    );
+
+    if (selected == null) return; // user dismissed
+
     setState(() {
-      if (index < _localMissions.length && _localMissions[index].isNotEmpty) {
-        _localMissions[index] = '';
-      } else {
-        // Placeholder for now
-        _localMissions[index] = 'mission_${index + 1}';
+      // Expand list if needed (though we keep it at 4 normally)
+      while (_assignedMissions.length <= slotIndex) {
+        _assignedMissions.add(null);
       }
+      _assignedMissions[slotIndex] = selected;
     });
-    widget.onMissionsChanged(_localMissions.where((m) => m.isNotEmpty).toList());
+
+    widget.onMissionsChanged(
+      _assignedMissions.whereType<MissionType>().toList(),
+    );
+  }
+
+  void _removeMission(int index) {
+    HapticFeedback.mediumImpact();
+    setState(() => _assignedMissions[index] = null);
+    widget.onMissionsChanged(
+      _assignedMissions.whereType<MissionType>().toList(),
+    );
   }
 
   void _toggleWakeUpCheck() {
@@ -55,7 +83,7 @@ class _MissionCardState extends State<MissionCard> {
     widget.onWakeUpCheckChanged(_localWakeUpCheck);
   }
 
-  int get _completedCount => _localMissions.where((m) => m.isNotEmpty).length;
+  int get _completedCount => _assignedMissions.where((m) => m != null).length;
 
   @override
   Widget build(BuildContext context) {
@@ -138,15 +166,7 @@ class _MissionCardState extends State<MissionCard> {
 
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(4, (i) {
-                    final isAssigned = i < _localMissions.length && _localMissions[i].isNotEmpty;
-                    return _MissionSlotButton(
-                      index: i,
-                      isAssigned: isAssigned,
-                      onTap: () => _onMissionSlotTapped(i),
-                      size: size,
-                    );
-                  }),
+                  children: List.generate(4, (i) => _buildSlotButton(i, size)),
                 );
               },
             ),
@@ -158,6 +178,47 @@ class _MissionCardState extends State<MissionCard> {
             _buildWakeUpCheckRow(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSlotButton(int index, double size) {
+    final mission = index < _assignedMissions.length ? _assignedMissions[index] : null;
+
+    return GestureDetector(
+      onTap: () => _onMissionSlotTapped(index),
+      onLongPress: mission != null ? () => _removeMission(index) : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: mission != null ? mission.iconBgColor.withOpacity(0.3) : const Color(0xFF252525),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: mission != null ? mission.iconBgColor.withOpacity(0.6) : const Color(0xFF333333),
+            width: 1.5,
+          ),
+        ),
+        child: mission != null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(mission.icon, color: Colors.white, size: size * 0.38),
+                  const SizedBox(height: 4),
+                  Text(
+                    mission.name.split(' ').first, // first word only
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              )
+            : Icon(Icons.add_rounded, color: const Color(0xFF606060), size: size * 0.38),
       ),
     );
   }
@@ -214,91 +275,6 @@ class _MissionCardState extends State<MissionCard> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MissionSlotButton extends StatefulWidget {
-  final int index;
-  final bool isAssigned;
-  final VoidCallback onTap;
-  final double size;
-
-  const _MissionSlotButton({
-    required this.index,
-    required this.isAssigned,
-    required this.onTap,
-    required this.size,
-  });
-
-  @override
-  State<_MissionSlotButton> createState() => _MissionSlotButtonState();
-}
-
-class _MissionSlotButtonState extends State<_MissionSlotButton> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.90).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _handleTap() async {
-    await _controller.forward();
-    _controller.reverse();
-    widget.onTap();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Special styling for first slot if empty
-    final isFirstEmpty = widget.index == 0 && !widget.isAssigned;
-
-    return GestureDetector(
-      onTap: _handleTap,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: widget.size,
-          height: widget.size,
-          decoration: BoxDecoration(
-            color: widget.isAssigned
-                ? const Color(0xFF1A3A35)
-                : (isFirstEmpty ? const Color(0xFF2A2A2A) : const Color(0xFF252525)),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: widget.isAssigned
-                  ? const Color(0xFF14B8A6)
-                  : (isFirstEmpty ? const Color(0xFF3A3A3A) : const Color(0xFF333333)),
-              width: 1.5,
-            ),
-          ),
-          child: Center(
-            child: widget.isAssigned
-                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF14B8A6), size: 28)
-                : Icon(
-                    Icons.add_rounded,
-                    size: 24,
-                    color: isFirstEmpty ? const Color(0xFF808080) : const Color(0xFF505050),
-                  ),
-          ),
-        ),
-      ),
     );
   }
 }

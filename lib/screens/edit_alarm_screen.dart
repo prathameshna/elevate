@@ -1,16 +1,19 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/alarm.dart';
-import '../models/mission.dart';
+import '../models/mission_type.dart';
+import '../models/my_music_track.dart';
+import '../models/sound_item.dart';
 import '../providers/alarm_provider.dart';
 import '../services/alarm_service.dart';
 import '../widgets/day_selector/day_selector_widget.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/time_picker/time_picker_wheel.dart';
 import '../widgets/snooze_config_modal.dart';
-import 'mission_selection_screen.dart';
 import 'sound_selection_screen.dart';
 import 'vibration_selection_screen.dart';
 
@@ -38,7 +41,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   late String _selectedVibration;
   late int _snoozeMinutes;
   late bool _alwaysSnooze;
-  late List<String> _assignedMissions;
+  late List<MissionType> _assignedMissions;
   late bool _enableWakeUpCheck;
   late bool _showMemoAfter;
   late String _memoText;
@@ -48,10 +51,27 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
   late TextEditingController _memoController;
 
+  List<MyMusicTrack> _myMusicTracks = [];
+
   @override
   void initState() {
     super.initState();
     _initializeState();
+    _loadMyMusicTracks();
+  }
+
+  Future<void> _loadMyMusicTracks() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = prefs.getStringList('my_music_tracks') ?? [];
+      if (mounted) {
+        setState(() {
+          _myMusicTracks = encoded
+              .map((e) => MyMusicTrack.fromJson(jsonDecode(e)))
+              .toList();
+        });
+      }
+    } catch (_) {}
   }
 
   void _initializeState() {
@@ -67,7 +87,9 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         _selectedMinute = _selectedTime.minute;
         _isEnabled = alarm.isEnabled;
         _selectedDays = Set<int>.from(alarm.selectedDays);
-        _assignedMissions = List<String>.from(alarm.missionIds);
+        _assignedMissions = alarm.missionIds
+            .map((id) => allMissions.firstWhere((m) => m.id == id, orElse: () => allMissions.first))
+            .toList();
         _selectedSound = alarm.sound;
         _selectedVibration = alarm.vibrationPattern;
         _snoozeMinutes = alarm.snoozeMinutes;
@@ -120,12 +142,41 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
 
 
+  String _getSoundName() {
+    if (_selectedSound == 'default_alarm') return 'Default';
+    for (final sounds in soundLibrary.values) {
+      for (final s in sounds) {
+        if (s.id == _selectedSound) return s.name;
+      }
+    }
+    for (final track in _myMusicTracks) {
+      if (track.id == _selectedSound) return track.name;
+    }
+    if (_selectedSound.startsWith('my_')) return 'Custom Sound';
+    return _selectedSound;
+  }
+
   void _openSoundSelection() async {
     final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const SoundSelectionScreen()),
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 380),
+        reverseTransitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (_, animation, __) => SoundSelectionScreen(initialSoundId: _selectedSound),
+        transitionsBuilder: (_, animation, __, child) {
+          final slide = Tween<Offset>(
+            begin: const Offset(0, 0.08),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+          final fade = Tween<double>(begin: 0.0, end: 1.0).animate(
+            CurvedAnimation(parent: animation, curve: const Interval(0.0, 0.65, curve: Curves.easeOut)),
+          );
+          return FadeTransition(opacity: fade, child: SlideTransition(position: slide, child: child));
+        },
+      ),
     );
-    if (result != null) {
+    if (result != null && mounted) {
       setState(() => _selectedSound = result);
+      _loadMyMusicTracks();
       HapticFeedback.selectionClick();
     }
   }
@@ -172,7 +223,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         sound: _selectedSound,
         isEnabled: _isEnabled,
         selectedDays: _selectedDays,
-        missionIds: _assignedMissions,
+        missionIds: _assignedMissions.map((m) => m.id).toList(), // Updated to map MissionType back to IDs
         vibrationPattern: _selectedVibration,
         snoozeMinutes: _snoozeMinutes,
         alwaysSnooze: _alwaysSnooze,
@@ -347,7 +398,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
                   // Mission tile removed as it's now in MissionCard
                   _buildProfessionalSettingTile(
                     label: 'Sound',
-                    value: _selectedSound,
+                    value: _getSoundName(),
                     onTap: _openSoundSelection,
                   ),
                   const SizedBox(height: 12),
