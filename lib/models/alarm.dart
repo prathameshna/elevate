@@ -9,9 +9,8 @@ class Alarm {
   final Set<int> selectedDays; // 0=Sun, 1=Mon, ..., 6=Sat
 
   final List<String> missionIds;
-  final String? vibrationPatternId;
+  final String vibrationId;
   final bool vibrationEnabled;
-  final double vibrationIntensity;
   final int snoozeMinutes;
   final bool alwaysSnooze; 
   final bool enableWakeUpCheck;
@@ -28,9 +27,8 @@ class Alarm {
     this.isEnabled = true,
     this.selectedDays = const {},
     this.missionIds = const [],
-    this.vibrationPatternId = 'basic',
+    this.vibrationId = 'basic',
     this.vibrationEnabled = true,
-    this.vibrationIntensity = 1.0,
     this.snoozeMinutes = 5,
     this.alwaysSnooze = true,
     this.enableWakeUpCheck = false,
@@ -51,9 +49,8 @@ class Alarm {
       'isEnabled': isEnabled,
       'selectedDays': selectedDays.toList(),
       'missionIds': missionIds,
-      'vibrationPatternId': vibrationPatternId,
+      'vibrationId': vibrationId,
       'vibrationEnabled': vibrationEnabled,
-      'vibrationIntensity': vibrationIntensity,
       'snoozeMinutes': snoozeMinutes,
       'alwaysSnooze': alwaysSnooze,
       'enableWakeUpCheck': enableWakeUpCheck,
@@ -75,9 +72,8 @@ class Alarm {
       isEnabled: json['isEnabled'] as bool? ?? json['enabled'] as bool? ?? true,
       selectedDays: Set<int>.from(json['selectedDays'] ?? json['repeatDays'] ?? []),
       missionIds: List<String>.from(json['missionIds'] ?? (json['missionId'] != null ? [json['missionId']] : [])),
-      vibrationPatternId: json['vibrationPatternId'] as String? ?? json['vibrationPattern'] as String? ?? 'basic',
+      vibrationId: json['vibrationId'] as String? ?? json['vibrationPattern'] as String? ?? 'basic',
       vibrationEnabled: json['vibrationEnabled'] as bool? ?? json['vibration'] as bool? ?? true,
-      vibrationIntensity: (json['vibrationIntensity'] as num?)?.toDouble() ?? 1.0,
       snoozeMinutes: json['snoozeMinutes'] as int? ?? 5,
       alwaysSnooze: json['alwaysSnooze'] as bool? ?? true,
       enableWakeUpCheck: json['enableWakeUpCheck'] as bool? ?? false,
@@ -95,9 +91,8 @@ class Alarm {
     bool? isEnabled,
     Set<int>? selectedDays,
     List<String>? missionIds,
-    String? vibrationPatternId,
+    String? vibrationId,
     bool? vibrationEnabled,
-    double? vibrationIntensity,
     int? snoozeMinutes,
     bool? alwaysSnooze,
     bool? enableWakeUpCheck,
@@ -113,9 +108,8 @@ class Alarm {
       isEnabled: isEnabled ?? this.isEnabled,
       selectedDays: selectedDays ?? this.selectedDays,
       missionIds: missionIds ?? this.missionIds,
-      vibrationPatternId: vibrationPatternId ?? this.vibrationPatternId,
+      vibrationId: vibrationId ?? this.vibrationId,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
-      vibrationIntensity: vibrationIntensity ?? this.vibrationIntensity,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
       alwaysSnooze: alwaysSnooze ?? this.alwaysSnooze,
       enableWakeUpCheck: enableWakeUpCheck ?? this.enableWakeUpCheck,

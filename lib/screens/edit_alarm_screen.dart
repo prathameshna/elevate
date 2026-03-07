@@ -8,7 +8,7 @@ import '../models/alarm.dart';
 import '../models/mission_type.dart';
 import '../models/my_music_track.dart';
 import '../models/sound_item.dart';
-import '../models/vibration_pattern.dart';
+import '../models/vibration_item.dart';
 import '../providers/alarm_provider.dart';
 import '../services/alarm_service.dart';
 import '../widgets/day_selector/day_selector_widget.dart';
@@ -16,7 +16,7 @@ import '../widgets/mission_card.dart';
 import '../widgets/time_picker/time_picker_wheel.dart';
 import '../widgets/snooze_config_modal.dart';
 import 'sound_selection_screen.dart';
-import 'vibration_selection_screen.dart';
+import 'vibration_screen.dart';
 
 class EditAlarmScreen extends StatefulWidget {
   final String? alarmId;
@@ -39,7 +39,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   late Set<int> _selectedDays;
   late bool _isEnabled;
   String? _selectedSoundId;
-  String? _selectedVibrationPatternId;
+  String _selectedVibrationId = 'basic';
   late int _snoozeMinutes;
   late bool _alwaysSnooze;
   late List<MissionType> _assignedMissions;
@@ -92,7 +92,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
             .map((id) => allMissions.firstWhere((m) => m.id == id, orElse: () => allMissions.first))
             .toList();
         _selectedSoundId = alarm.soundId;
-        _selectedVibrationPatternId = alarm.vibrationPatternId;
+        _selectedVibrationId = alarm.vibrationId;
         _snoozeMinutes = alarm.snoozeMinutes;
         _alwaysSnooze = alarm.alwaysSnooze;
         _enableWakeUpCheck = alarm.enableWakeUpCheck;
@@ -105,7 +105,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         _selectedDays = {};
         _assignedMissions = [];
         _selectedSoundId = null;
-        _selectedVibrationPatternId = 'basic';
+        _selectedVibrationId = 'basic';
         _snoozeMinutes = 5;
         _alwaysSnooze = true;
         _enableWakeUpCheck = false;
@@ -122,7 +122,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       _selectedDays = {};
       _assignedMissions = [];
       _selectedSoundId = null;
-      _selectedVibrationPatternId = 'basic';
+      _selectedVibrationId = 'basic';
       _snoozeMinutes = 5;
       _alwaysSnooze = true;
       _enableWakeUpCheck = false;
@@ -158,10 +158,11 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   }
 
   String _getVibrationName() {
-    if (_selectedVibrationPatternId == null) return 'Basic';
-    return allVibrationPatterns
-        .firstWhere((p) => p.id == _selectedVibrationPatternId,
-            orElse: () => allVibrationPatterns[2])
+    return kVibrations
+        .firstWhere(
+          (v) => v.id == _selectedVibrationId,
+          orElse: () => kVibrations.first,
+        )
         .name;
   }
 
@@ -191,28 +192,14 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   }
 
   void _openVibrationSelection() async {
-    final result = await Navigator.of(context).push<String>(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 380),
-        reverseTransitionDuration: const Duration(milliseconds: 300),
-        pageBuilder: (_, animation, __) => VibrationSelectionScreen(
-          initialPatternId: _selectedVibrationPatternId,
-        ),
-        transitionsBuilder: (_, animation, __, child) {
-          final slide = Tween<Offset>(
-            begin: const Offset(0, 0.08),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
-          final fade = Tween<double>(begin: 0.0, end: 1.0).animate(
-            CurvedAnimation(parent: animation, curve: const Interval(0.0, 0.65, curve: Curves.easeOut)),
-          );
-          return FadeTransition(opacity: fade, child: SlideTransition(position: slide, child: child));
-        },
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VibrationScreen(initialId: _selectedVibrationId),
       ),
     );
     if (result != null && mounted) {
-      setState(() => _selectedVibrationPatternId = result);
-      HapticFeedback.selectionClick();
+      setState(() => _selectedVibrationId = result);
     }
   }
 
@@ -249,7 +236,8 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         isEnabled: _isEnabled,
         selectedDays: _selectedDays,
         missionIds: _assignedMissions.map((m) => m.id).toList(), // Updated to map MissionType back to IDs
-        vibrationPatternId: _selectedVibrationPatternId,
+        vibrationId: _selectedVibrationId,
+        vibrationEnabled: true,
         snoozeMinutes: _snoozeMinutes,
         alwaysSnooze: _alwaysSnooze,
         enableWakeUpCheck: _enableWakeUpCheck,
