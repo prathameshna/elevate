@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import '../models/alarm.dart';
+import '../models/sound_item.dart';
 
 class NotificationService {
   NotificationService._();
@@ -64,6 +65,18 @@ class NotificationService {
 
     final vibrationPattern = Int64List.fromList([0, 500, 200, 500, 200, 500]);
 
+    String androidSoundName = 'alarm_ringtone';
+    if (alarm.soundId != null && alarm.soundId!.isNotEmpty && alarm.soundId != 'default_alarm') {
+      for (final sounds in soundLibrary.values) {
+        for (final s in sounds) {
+          if (s.id == alarm.soundId) {
+            androidSoundName = s.file.replaceAll('.mp3', '');
+            break;
+          }
+        }
+      }
+    }
+
     final androidDetails = AndroidNotificationDetails(
       'elevate_alarm_channel',
       'Elevate Alarms',
@@ -72,7 +85,7 @@ class NotificationService {
       priority: Priority.high,
       fullScreenIntent: true,
       playSound: true,
-      sound: const RawResourceAndroidNotificationSound('alarm_ringtone'),
+      sound: RawResourceAndroidNotificationSound(androidSoundName),
       enableVibration: true,
       vibrationPattern: vibrationPattern,
       category: AndroidNotificationCategory.alarm,
@@ -80,11 +93,11 @@ class NotificationService {
       ticker: 'Elevate Alarm',
     );
 
-    const iosDetails = DarwinNotificationDetails(
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-      sound: 'alarm_ringtone.mp3',
+      sound: '$androidSoundName.mp3',
       interruptionLevel: InterruptionLevel.critical,
     );
 

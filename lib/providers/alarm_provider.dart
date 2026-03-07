@@ -111,7 +111,7 @@ class AlarmProvider extends ChangeNotifier {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       time: time,
       label: '',
-      sound: 'default_alarm',
+      soundId: 'default_alarm',
       isEnabled: true,
       selectedDays: {}, 
     );

@@ -4,7 +4,7 @@ class Alarm {
   final String id;
   final TimeOfDay time;
   final String label;
-  final String sound;
+  final String? soundId;
   bool isEnabled;
   final Set<int> selectedDays; // 0=Sun, 1=Mon, ..., 6=Sat
 
@@ -23,7 +23,7 @@ class Alarm {
     required this.id,
     required this.time,
     this.label = '',
-    this.sound = 'default_alarm',
+    this.soundId,
     this.isEnabled = true,
     this.selectedDays = const {},
     this.missionIds = const [],
@@ -45,7 +45,7 @@ class Alarm {
       'timeHour': time.hour,
       'timeMinute': time.minute,
       'label': label,
-      'sound': sound,
+      'soundId': soundId,
       'isEnabled': isEnabled,
       'selectedDays': selectedDays.toList(),
       'missionIds': missionIds,
@@ -68,7 +68,7 @@ class Alarm {
         minute: json['timeMinute'] as int,
       ),
       label: json['label'] as String? ?? '',
-      sound: json['sound'] as String? ?? 'default_alarm',
+      soundId: json['soundId'] as String? ?? json['sound'] as String?,
       isEnabled: json['isEnabled'] as bool? ?? json['enabled'] as bool? ?? true,
       selectedDays: Set<int>.from(json['selectedDays'] ?? json['repeatDays'] ?? []),
       missionIds: List<String>.from(json['missionIds'] ?? (json['missionId'] != null ? [json['missionId']] : [])),
@@ -87,7 +87,7 @@ class Alarm {
     String? id,
     TimeOfDay? time,
     String? label,
-    String? sound,
+    String? soundId,
     bool? isEnabled,
     Set<int>? selectedDays,
     List<String>? missionIds,
@@ -104,7 +104,7 @@ class Alarm {
       id: id ?? this.id,
       time: time ?? this.time,
       label: label ?? this.label,
-      sound: sound ?? this.sound,
+      soundId: soundId ?? this.soundId,
       isEnabled: isEnabled ?? this.isEnabled,
       selectedDays: selectedDays ?? this.selectedDays,
       missionIds: missionIds ?? this.missionIds,

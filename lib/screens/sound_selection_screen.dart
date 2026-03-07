@@ -22,6 +22,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
 
   // ── State ─────────────────────────────────────────────────
   bool    _soundEnabled   = true;
+  bool    _isMuted        = false;
   String  _activeTab      = 'Ringtones';
   String  _activeCategory = 'Bright';
   String? _selectedSoundId;
@@ -51,6 +52,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   void initState() {
     super.initState();
     _selectedSoundId = widget.initialSoundId;
+    _loadSoundEnabled();
     _loadMyMusicTracks();
     _audioPlayer.onPlayerComplete.listen((_) {
       if (mounted) setState(() => _playingSoundId = null);
@@ -86,9 +88,44 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
     await prefs.setStringList('my_music_tracks', encoded);
   }
 
+  // ── Sound Settings Persistence ────────────────────────────
+
+  Future<void> _loadSoundEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _soundEnabled = prefs.getBool('sound_enabled') ?? true;
+    });
+  }
+
+  Future<void> _setSoundEnabled(bool value) async {
+    setState(() {
+      _soundEnabled = value;
+      if (!value) _isMuted = false;
+    });
+    if (!value) {
+      await _audioPlayer.stop();
+      setState(() => _playingSoundId = null);
+      await _audioPlayer.setVolume(_volume); // restore volume for next time
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('sound_enabled', value);
+  }
+
+  Future<void> _toggleMute() async {
+    HapticFeedback.lightImpact();
+    setState(() => _isMuted = !_isMuted);
+
+    if (_isMuted) {
+      await _audioPlayer.setVolume(0.0);   // silence but don't stop
+    } else {
+      await _audioPlayer.setVolume(_volume); // restore saved volume
+    }
+  }
+
   // ── Audio preview ─────────────────────────────────────────
 
   Future<void> _previewSound(SoundItem sound) async {
+    if (!_soundEnabled) return;
     await _audioPlayer.stop();
     setState(() => _playingSoundId = sound.id);
     try {
@@ -100,6 +137,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   }
 
   Future<void> _previewMyMusicTrack(MyMusicTrack track) async {
+    if (!_soundEnabled) return;
     await _audioPlayer.stop();
     setState(() => _playingSoundId = track.id);
     try {
@@ -272,7 +310,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
           const Spacer(),
           AlarmToggle(
             value: _soundEnabled,
-            onChanged: (v) => setState(() => _soundEnabled = v),
+            onChanged: _setSoundEnabled,
           ),
         ],
       ),
@@ -685,62 +723,99 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
       ),
       decoration: const BoxDecoration(
         color: Color(0xFF1E1E1E),
-        border: Border(
-          top: BorderSide(color: Color(0xFF2A2A2A)),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFF2A2A2A))),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Gradually increase volume row
-          Row(
-            children: [
-              const Text('Gradually increase volume',
-                style: TextStyle(
-                  color: Color(0xFFF5F5F5),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                )),
-              const Spacer(),
-              AlarmToggle(
-                value: _gradualVolume,
-                onChanged: (v) => setState(() => _gradualVolume = v),
+
+          // Gradually increase volume toggle
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: _soundEnabled ? 1.0 : 0.35,
+            child: IgnorePointer(
+              ignoring: !_soundEnabled,
+              child: Row(
+                children: [
+                  const Text('Gradually increase volume',
+                    style: TextStyle(
+                      color: Color(0xFFF5F5F5),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    )),
+                  const Spacer(),
+                  AlarmToggle(
+                    value: _gradualVolume,
+                    onChanged: (v) => setState(() => _gradualVolume = v),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
+
           const SizedBox(height: 14),
 
           // Volume slider row
-          Row(
-            children: [
-              const Icon(Icons.volume_up_rounded,
-                  color: Color(0xFFFFD600), size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: const Color(0xFFF5F5F5),
-                    inactiveTrackColor: const Color(0xFF3A3A3A),
-                    thumbColor: Colors.white,
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 10),
-                    overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 18),
-                    overlayColor: Colors.white.withOpacity(0.12),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: _soundEnabled ? 1.0 : 0.35,
+            child: IgnorePointer(
+              ignoring: !_soundEnabled,
+              child: Row(
+                children: [
+
+                  // ── Speaker icon (tappable mute) ──
+                  GestureDetector(
+                    onTap: _soundEnabled ? _toggleMute : null,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, anim) =>
+                          ScaleTransition(scale: anim, child: child),
+                      child: Icon(
+                        _isMuted
+                            ? Icons.volume_off_rounded
+                            : Icons.volume_up_rounded,
+                        key: ValueKey(_isMuted),
+                        color: _isMuted
+                            ? const Color(0xFF606060)
+                            : const Color(0xFFFFD600),
+                        size: 24,
+                      ),
+                    ),
                   ),
-                  child: Slider(
-                    value: _volume,
-                    min: 0,
-                    max: 1,
-                    onChanged: (v) {
-                      setState(() => _volume = v);
-                      _audioPlayer.setVolume(v);
-                    },
+
+                  const SizedBox(width: 12),
+
+                  // ── Volume slider ──
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: _isMuted
+                            ? const Color(0xFF3A3A3A)   // grey when muted
+                            : const Color(0xFFF5F5F5),
+                        inactiveTrackColor: const Color(0xFF3A3A3A),
+                        thumbColor: Colors.white,
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 10),
+                        overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 18),
+                        overlayColor: Colors.white.withOpacity(0.12),
+                      ),
+                      child: Slider(
+                        value: _volume,
+                        min: 0,
+                        max: 1,
+                        onChanged: (v) {
+                          setState(() => _volume = v);
+                          if (!_isMuted) _audioPlayer.setVolume(v);
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ],
       ),
