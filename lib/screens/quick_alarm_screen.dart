@@ -80,7 +80,7 @@ class _QuickAlarmScreenState extends State<QuickAlarmScreen>
       final alarm = provider.createNewForTime(timeOfDay).copyWith(
         label: 'Quick Alarm (+${_selectedDuration}m)',
         volume: _volume.toInt(),
-        vibration: _vibration,
+        vibrationEnabled: _vibration,
       );
 
       await provider.addAlarm(alarm);

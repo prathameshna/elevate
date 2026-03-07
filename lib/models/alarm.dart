@@ -9,7 +9,9 @@ class Alarm {
   final Set<int> selectedDays; // 0=Sun, 1=Mon, ..., 6=Sat
 
   final List<String> missionIds;
-  final String vibrationPattern;
+  final String? vibrationPatternId;
+  final bool vibrationEnabled;
+  final double vibrationIntensity;
   final int snoozeMinutes;
   final bool alwaysSnooze; 
   final bool enableWakeUpCheck;
@@ -17,7 +19,6 @@ class Alarm {
   final String? memoText;
 
   final int volume;
-  final bool vibration;
 
   Alarm({
     required this.id,
@@ -27,14 +28,15 @@ class Alarm {
     this.isEnabled = true,
     this.selectedDays = const {},
     this.missionIds = const [],
-    this.vibrationPattern = 'basic',
+    this.vibrationPatternId = 'basic',
+    this.vibrationEnabled = true,
+    this.vibrationIntensity = 1.0,
     this.snoozeMinutes = 5,
     this.alwaysSnooze = true,
     this.enableWakeUpCheck = false,
     this.showMemoAfter = false,
     this.memoText,
     this.volume = 50,
-    this.vibration = true,
   });
 
   bool get isOneTime => selectedDays.isEmpty;
@@ -49,14 +51,15 @@ class Alarm {
       'isEnabled': isEnabled,
       'selectedDays': selectedDays.toList(),
       'missionIds': missionIds,
-      'vibrationPattern': vibrationPattern,
+      'vibrationPatternId': vibrationPatternId,
+      'vibrationEnabled': vibrationEnabled,
+      'vibrationIntensity': vibrationIntensity,
       'snoozeMinutes': snoozeMinutes,
       'alwaysSnooze': alwaysSnooze,
       'enableWakeUpCheck': enableWakeUpCheck,
       'showMemoAfter': showMemoAfter,
       'memoText': memoText,
       'volume': volume,
-      'vibration': vibration,
     };
   }
 
@@ -72,14 +75,15 @@ class Alarm {
       isEnabled: json['isEnabled'] as bool? ?? json['enabled'] as bool? ?? true,
       selectedDays: Set<int>.from(json['selectedDays'] ?? json['repeatDays'] ?? []),
       missionIds: List<String>.from(json['missionIds'] ?? (json['missionId'] != null ? [json['missionId']] : [])),
-      vibrationPattern: json['vibrationPattern'] as String? ?? 'basic',
+      vibrationPatternId: json['vibrationPatternId'] as String? ?? json['vibrationPattern'] as String? ?? 'basic',
+      vibrationEnabled: json['vibrationEnabled'] as bool? ?? json['vibration'] as bool? ?? true,
+      vibrationIntensity: (json['vibrationIntensity'] as num?)?.toDouble() ?? 1.0,
       snoozeMinutes: json['snoozeMinutes'] as int? ?? 5,
       alwaysSnooze: json['alwaysSnooze'] as bool? ?? true,
       enableWakeUpCheck: json['enableWakeUpCheck'] as bool? ?? false,
       showMemoAfter: json['showMemoAfter'] as bool? ?? false,
       memoText: json['memoText'] as String?,
       volume: json['volume'] as int? ?? 50,
-      vibration: json['vibration'] as bool? ?? true,
     );
   }
 
@@ -91,14 +95,15 @@ class Alarm {
     bool? isEnabled,
     Set<int>? selectedDays,
     List<String>? missionIds,
-    String? vibrationPattern,
+    String? vibrationPatternId,
+    bool? vibrationEnabled,
+    double? vibrationIntensity,
     int? snoozeMinutes,
     bool? alwaysSnooze,
     bool? enableWakeUpCheck,
     bool? showMemoAfter,
     String? memoText,
     int? volume,
-    bool? vibration,
   }) {
     return Alarm(
       id: id ?? this.id,
@@ -108,14 +113,15 @@ class Alarm {
       isEnabled: isEnabled ?? this.isEnabled,
       selectedDays: selectedDays ?? this.selectedDays,
       missionIds: missionIds ?? this.missionIds,
-      vibrationPattern: vibrationPattern ?? this.vibrationPattern,
+      vibrationPatternId: vibrationPatternId ?? this.vibrationPatternId,
+      vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+      vibrationIntensity: vibrationIntensity ?? this.vibrationIntensity,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
       alwaysSnooze: alwaysSnooze ?? this.alwaysSnooze,
       enableWakeUpCheck: enableWakeUpCheck ?? this.enableWakeUpCheck,
       showMemoAfter: showMemoAfter ?? this.showMemoAfter,
       memoText: memoText ?? this.memoText,
       volume: volume ?? this.volume,
-      vibration: vibration ?? this.vibration,
     );
   }
 
