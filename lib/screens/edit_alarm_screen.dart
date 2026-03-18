@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
-import '../models/alarm.dart';
+import '../models/alarm.dart' as app_alarm;
 import '../models/my_music_track.dart';
 import '../models/sound_item.dart';
 import '../models/vibration_item.dart';
-import '../alarm/alarm_scheduler.dart';
-import '../services/alarm_service.dart';
+import '../alarm/alarm_manager.dart';
+import '../services/alarm_storage.dart';
 import '../widgets/day_selector/day_selector_widget.dart';
 import '../missions/colour_tiles/colour_tiles_config_screen.dart';
 import '../missions/colour_tiles/colour_tiles_model.dart';
@@ -80,62 +81,59 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
   void _initializeState() {
     _isEditMode = widget.alarmId != null;
+    
+    // Always initialize late variables with defaults first to avoid LateInitializationError
+    _selectedTime = TimeOfDay.now();
+    _selectedDays = {};
+    _isEnabled = true;
+    _snoozeMinutes = 5;
+    _alwaysSnooze = true;
+    _showMemoAfter = false;
+    _memoText = '';
+    _isLoading = _isEditMode;
 
-    if (_isEditMode) {
-      try {
-        final alarm = AlarmService.instance.alarms.firstWhere((a) => a.id == widget.alarmId);
-        _selectedTime = alarm.time;
-        _isEnabled = alarm.isEnabled;
-        _selectedDays = Set<int>.from(alarm.selectedDays);
-        _missionSlots = List.generate(4, (i) {
-          if (i < alarm.missions.length) {
-            return alarm.missions[i];
-          }
-          return null;
-        });
-        _selectedSoundId = alarm.soundId;
-        _selectedVibrationId = alarm.vibrationId;
-        _snoozeMinutes = alarm.snoozeMinutes;
-        _alwaysSnooze = alarm.alwaysSnooze;
-        _wakeUpCheckEnabled = alarm.enableWakeUpCheck;
-        _showMemoAfter = alarm.showMemoAfter;
-        _memoText = alarm.memo ?? '';
-        _selectedSoundFile = alarm.soundFile;
-        _snoozeEnabled = alarm.snoozeEnabled;
-      } catch (e) {
-        // Fallback if alarm not found
-        _selectedTime = TimeOfDay.now();
-        _isEnabled = true;
-        _selectedDays = {};
-        _missionSlots = [null, null, null, null];
-        _selectedSoundId = null;
-        _selectedVibrationId = 'basic';
-        _snoozeMinutes = 5;
-        _alwaysSnooze = true;
-        _wakeUpCheckEnabled = false;
-        _showMemoAfter = false;
-        _memoText = '';
-        _selectedSoundFile = null;
-        _snoozeEnabled = false;
-      }
-    } else {
-      _selectedTime = TimeOfDay.now();
-      _isEnabled = true;
-      _selectedDays = {};
+    if (!_isEditMode) {
       _missionSlots = [null, null, null, null];
       _selectedSoundId = null;
       _selectedVibrationId = 'basic';
-      _snoozeMinutes = 5;
-      _alwaysSnooze = true;
       _wakeUpCheckEnabled = false;
-      _showMemoAfter = false;
-      _memoText = '';
       _selectedSoundFile = null;
       _snoozeEnabled = false;
     }
 
-    _isLoading = false;
     _memoController = TextEditingController(text: _memoText);
+    
+    if (_isEditMode) {
+      _loadAlarmData();
+    }
+  }
+
+  Future<void> _loadAlarmData() async {
+    try {
+      final alarm = await AlarmStorage.loadOne(widget.alarmId!); 
+      if (alarm != null && mounted) {
+        setState(() {
+          _selectedTime = alarm.time;
+          _isEnabled = alarm.isEnabled;
+          _selectedDays = Set<int>.from(alarm.days);
+          _missionSlots = List.generate(4, (i) {
+            if (i < alarm.missions.length) {
+              return alarm.missions[i];
+            }
+            return null;
+          });
+          _selectedVibrationId = alarm.vibrationId;
+          _snoozeMinutes = alarm.snoozeMinutes;
+          _memoText = alarm.memo ?? '';
+          _selectedSoundFile = alarm.soundFile;
+          _snoozeEnabled = alarm.snoozeEnabled;
+          _isLoading = false;
+          _memoController.text = _memoText;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
 
@@ -200,6 +198,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
     }
   }
 
+
   void _openVibrationSelection() async {
     final result = await Navigator.push<String>(
       context,
@@ -237,45 +236,41 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
     HapticFeedback.mediumImpact();
 
     try {
-      final alarm = Alarm(
-        id: _isEditMode ? widget.alarmId! : DateTime.now().millisecondsSinceEpoch.toString(),
-        time: _selectedTime,
-        label: '',
-        soundId: _selectedSoundId,
-        soundFile: _selectedSoundFile ?? 'alarm_ringtone.mp3',
-        soundEnabled: true,
-        isEnabled: _isEnabled,
-        selectedDays: _selectedDays,
-        vibrationId: _selectedVibrationId,
-        vibrationEnabled: true,
-        snoozeEnabled: _snoozeEnabled,
-        snoozeMinutes: _snoozeMinutes,
-        alwaysSnooze: _alwaysSnooze,
-        enableWakeUpCheck: _wakeUpCheckEnabled,
-        showMemoAfter: _showMemoAfter,
-        memoText: _showMemoAfter ? _memoController.text : _memoController.text,
-        missions: _missionSlots
-            .where((s) => s != null)
-            .map((s) => s!)
-            .toList(),
-        volume: 50,
-        snoozeCount: 0,
+      final missions = _missionSlots
+          .where((s) => s != null)
+          .map((s) => s!)
+          .toList();
+
+      final alarm = app_alarm.Alarm(
+        id:                _isEditMode ? widget.alarmId! : const Uuid().v4(),
+        time:              _selectedTime,
+        selectedDays:      _selectedDays,
+        isEnabled:         _isEnabled,
+        label:             '', 
+        memoText:          _memoController.text.trim(),
+        soundFile:         _selectedSoundFile ?? 'bright_bell.mp3',
+        soundEnabled:      true,
+        vibrationId:       _selectedVibrationId,
+        vibrationEnabled:  true,
+        snoozeEnabled:     _snoozeEnabled,
+        snoozeMinutes:     _snoozeMinutes,
+        missions:          missions,
       );
 
-      if (_isEditMode) {
-        await AlarmService.instance.updateAlarm(alarm);
+      // Save to local storage
+      await AlarmStorage.save(alarm);
+
+      // Schedule with OS — THIS MAKES IT RING
+      if (alarm.isEnabled) {
+        await AlarmManager.schedule(alarm);
       } else {
-        await AlarmService.instance.createAlarm(alarm);
+        await AlarmManager.cancel(alarm);
       }
-      
-      await AlarmScheduler.instance.schedule(alarm);
 
       debugPrint('--- ALARM SAVED ---');
-      debugPrint('Label: ${alarm.label}');
+      debugPrint('ID: ${alarm.id}');
       debugPrint('Time: ${alarm.time.hour}:${alarm.time.minute}');
       debugPrint('Sound: ${alarm.soundFile}');
-      debugPrint('VibId: ${alarm.vibrationId}');
-      debugPrint('Memo: ${alarm.memo}');
       debugPrint('-------------------');
 
       if (!mounted) return;
@@ -296,7 +291,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         ),
       );
 
-      Navigator.pop(context, alarm);
+      Navigator.pop(context); // ← pop triggers .then() in list
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -310,6 +305,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

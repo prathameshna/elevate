@@ -1,91 +1,64 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../alarm/alarm_manager.dart';
 import '../models/alarm.dart';
-import '../alarm/alarm_scheduler.dart';
+import '../services/alarm_storage.dart';
 
-class AlarmProvider extends ChangeNotifier {
-  final List<Alarm> _alarms = [];
-  bool _isLoading = true;
+class AlarmProvider with ChangeNotifier {
+  List<Alarm> _alarms = [];
+  bool _isLoading = false;
 
-  List<Alarm> get alarms => List.unmodifiable(_alarms);
+  List<Alarm> get alarms => _alarms;
   bool get isLoading => _isLoading;
 
   AlarmProvider() {
-    _loadAlarms();
+    loadAlarms();
   }
 
-  Future<void> _loadAlarms() async {
+  Future<void> loadAlarms() async {
     _isLoading = true;
     notifyListeners();
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final alarmData = prefs.getStringList('alarms') ?? [];
-      
-      _alarms.clear();
-      for (final item in alarmData) {
-        try {
-          _alarms.add(Alarm.fromJson(jsonDecode(item)));
-        } catch (e) {
-          debugPrint('Error decoding alarm: $e');
-        }
-      }
-      _sortAlarms();
-    } catch (e) {
-      debugPrint('Error loading alarms: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> _saveAlarms() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final alarmData = _alarms.map((a) => jsonEncode(a.toJson())).toList();
-      await prefs.setStringList('alarms', alarmData);
-    } catch (e) {
-      debugPrint('Error saving alarms: $e');
-    }
+    _alarms = await AlarmStorage.loadList();
+    _sortAlarms();
+    
+    _isLoading = false;
+    notifyListeners();
   }
 
   void _sortAlarms() {
     _alarms.sort((a, b) {
-      final aMinutes = a.time.hour * 60 + a.time.minute;
-      final bMinutes = b.time.hour * 60 + b.time.minute;
-      return aMinutes.compareTo(bMinutes);
+      final aMin = a.time.hour * 60 + a.time.minute;
+      final bMin = b.time.hour * 60 + b.time.minute;
+      return aMin.compareTo(bMin);
     });
   }
 
   Future<void> addAlarm(Alarm alarm) async {
-    _alarms.add(alarm);
-    _sortAlarms();
-    await _saveAlarms();
-    await AlarmScheduler.instance.schedule(alarm);
-    notifyListeners();
+    await AlarmStorage.save(alarm);
+    if (alarm.isEnabled) {
+      await AlarmManager.schedule(alarm);
+    }
+    await loadAlarms();
   }
 
   Future<void> updateAlarm(Alarm alarm) async {
-    final index = _alarms.indexWhere((a) => a.id == alarm.id);
-    if (index != -1) {
-      _alarms[index] = alarm;
-      _sortAlarms();
-      await _saveAlarms();
-      await AlarmScheduler.instance.schedule(alarm);
-      notifyListeners();
+    await AlarmStorage.save(alarm);
+    if (alarm.isEnabled) {
+      await AlarmManager.schedule(alarm);
+    } else {
+      await AlarmManager.cancel(alarm);
     }
+    await loadAlarms();
   }
 
   Future<void> deleteAlarm(String id) async {
-    final index = _alarms.indexWhere((a) => a.id == id);
-    if (index != -1) {
-      final alarm = _alarms[index];
-      _alarms.removeAt(index);
-      await _saveAlarms();
-      await AlarmScheduler.instance.cancel(alarm);
-      notifyListeners();
-    }
+    try {
+      final alarm = _alarms.firstWhere((a) => a.id == id);
+      await AlarmManager.cancel(alarm);
+    } catch (_) {}
+
+    await AlarmStorage.delete(id);
+    await loadAlarms();
   }
 
   Future<void> toggleAlarm(String id) async {
@@ -93,16 +66,16 @@ class AlarmProvider extends ChangeNotifier {
     if (index != -1) {
       final alarm = _alarms[index];
       final updated = alarm.copyWith(isEnabled: !alarm.isEnabled);
-      _alarms[index] = updated;
-      await _saveAlarms();
+      
+      await AlarmStorage.save(updated);
       
       if (updated.isEnabled) {
-        await AlarmScheduler.instance.schedule(updated);
+        await AlarmManager.schedule(updated);
       } else {
-        await AlarmScheduler.instance.cancel(updated);
+        await AlarmManager.cancel(updated);
       }
       
-      notifyListeners();
+      await loadAlarms();
     }
   }
 

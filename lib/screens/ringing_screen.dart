@@ -1,43 +1,49 @@
+import 'package:alarm/alarm.dart' as alarm_pkg;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/alarm.dart';
-import '../alarm/alarm_service.dart';
-import '../alarm/alarm_scheduler.dart';
+import '../alarm/alarm_manager.dart';
 import '../missions/colour_tiles/colour_tiles_challenge_screen.dart';
 import '../missions/colour_tiles/colour_tiles_model.dart';
-// Add if memory is used
 
 class RingingScreen extends StatefulWidget {
-  final Alarm alarm;
-  const RingingScreen({super.key, required this.alarm});
+  final Alarm                     alarm;
+  final alarm_pkg.AlarmSettings   alarmSettings;
+
+  const RingingScreen({
+    super.key,
+    required this.alarm,
+    required this.alarmSettings,
+  });
 
   @override
   State<RingingScreen> createState() => _RingingScreenState();
 }
 
 class _RingingScreenState extends State<RingingScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
 
+  int  _missionIndex = 0;
+  bool _dismissed    = false;
+
+  // Subtle pulse on time display
   late AnimationController _pulseCtrl;
   late Animation<double>   _pulseAnim;
-
-  bool _snoozed = false;
-  int _missionIndex = 0;
 
   @override
   void initState() {
     super.initState();
-
-    // Keep screen on
     WakelockPlus.enable();
 
-    // Pulse animation for time display
     _pulseCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1000))
-      ..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.03)
-        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+      vsync:    this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.02).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -47,48 +53,31 @@ class _RingingScreenState extends State<RingingScreen>
     super.dispose();
   }
 
-  // ── Snooze ─────────────────────────────────────────────
+  // ── Snooze ───────────────────────────────────────────────
   Future<void> _snooze() async {
-    if (_snoozed) return;
-    
-    // Max snooze safety
-    const maxSnoozes = 3;
-    if (widget.alarm.snoozeCount >= maxSnoozes) {
-      // Force mission — no more snoozing
-      _startMission();
-      return;
-    }
-    
-    setState(() => _snoozed = true);
+    if (_dismissed) return;
+    _dismissed = true;
     HapticFeedback.mediumImpact();
-
-    await AlarmService.stopRinging();
-    await AlarmScheduler.scheduleSnooze(
-      widget.alarm.copyWith(snoozeCount: widget.alarm.snoozeCount + 1),
-    );
-
+    await AlarmManager.snooze(widget.alarm);
     if (mounted) Navigator.of(context).pop();
   }
 
-  // ── Start mission ───────────────────────────────────────
+  // ── Mission ──────────────────────────────────────────────
   void _startMission() {
-    HapticFeedback.heavyImpact();
     final missions = widget.alarm.missions;
-
     if (missions.isEmpty) {
-      _dismissAlarm(); // no mission — dismiss directly
+      _dismissAlarm();
       return;
     }
-
     _runMission(missions[_missionIndex]);
   }
 
-  void _runMission(Map<String, dynamic> missionData) {
-    final type = missionData['type'] as String;
+  void _runMission(Map<String, dynamic> data) {
+    final type = data['type'] as String? ?? '';
 
     if (type == 'colour_tiles') {
       final config = ColourTilesConfig.fromJson(
-        Map<String, dynamic>.from(missionData['config'] as Map),
+        Map<String, dynamic>.from(data['config'] as Map),
       );
       Navigator.push(
         context,
@@ -99,38 +88,30 @@ class _RingingScreenState extends State<RingingScreen>
           ),
         ),
       );
-    } else {
-      // Fallback dismiss if mission not handled
-      _dismissAlarm();
     }
   }
 
   void _missionDone() {
-    // Close current mission screen
-    if (Navigator.canPop(context)) {
-      Navigator.of(context).pop();
-    }
-
+    if (Navigator.canPop(context)) Navigator.pop(context);
     _missionIndex++;
     final missions = widget.alarm.missions;
-
     if (_missionIndex < missions.length) {
       Future.delayed(const Duration(milliseconds: 400), () {
         if (mounted) _runMission(missions[_missionIndex]);
       });
     } else {
-      // All missions done
       _dismissAlarm();
     }
   }
 
-  // ── Dismiss ─────────────────────────────────────────────
   Future<void> _dismissAlarm() async {
-    await AlarmService.stopRinging();
+    if (_dismissed) return;
+    _dismissed = true;
+    await AlarmManager.stopRinging(widget.alarm);
     if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
-  // ── Time formatting ─────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────
   String get _timeString {
     final h = widget.alarm.time.hourOfPeriod == 0
         ? 12
@@ -139,178 +120,157 @@ class _RingingScreenState extends State<RingingScreen>
     return '$h:$m';
   }
 
-  String get _periodString =>
-      widget.alarm.time.period == DayPeriod.am ? 'AM' : 'PM';
-
   String get _dateString {
-    final now  = DateTime.now();
-    const days = ['Monday', 'Tuesday', 'Wednesday',
-                  'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const months = ['January', 'February', 'March', 'April', 'May',
-                    'June', 'July', 'August', 'September', 'October',
-                    'November', 'December'];
-    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+    final n      = DateTime.now();
+    const days   = ['Monday','Tuesday','Wednesday',
+                    'Thursday','Friday','Saturday','Sunday'];
+    const months = ['January','February','March','April','May',
+                    'June','July','August','September','October',
+                    'November','December'];
+    return '${days[n.weekday - 1]}, ${n.day} ${months[n.month - 1]} ${n.year}';
   }
 
+  bool get _hasMission => widget.alarm.missions.isNotEmpty;
+
+  // ── Build ────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // cannot go back — must solve mission
+      canPop: false,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0A0A0A),
+        backgroundColor: const Color(0xFF080808),
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                const Spacer(flex: 2),
+          child: Column(
+            children: [
 
-                // ── Date ──────────────────────────────────
-                Text(
-                  _dateString,
-                  style: const TextStyle(
-                    color:      Color(0xFF888888),
-                    fontSize:   15,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                const SizedBox(height: 12),
+              // ── TOP: date + time + label ───────────────
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
 
-                // ── Time ──────────────────────────────────
-                ScaleTransition(
-                  scale: _pulseAnim,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
+                    // Date
+                    Text(
+                      _dateString,
+                      style: const TextStyle(
+                        color:      Color(0xFF888888),
+                        fontSize:   15,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Time — large bold, matches image
+                    ScaleTransition(
+                      scale: _pulseAnim,
+                      child: Text(
                         _timeString,
                         style: const TextStyle(
                           color:       Color(0xFFF5F5F5),
-                          fontSize:    88,
-                          fontWeight:  FontWeight.w300,
-                          letterSpacing: -4,
+                          fontSize:    100,
+                          fontWeight:  FontWeight.w700,
+                          letterSpacing: -3,
                           height:      1.0,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Label
+                    if (widget.alarm.label.isNotEmpty)
                       Text(
-                        _periodString,
+                        widget.alarm.label,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
-                          color:      Color(0xFF888888),
-                          fontSize:   22,
+                          color:      Color(0xFFDDDDDD),
+                          fontSize:   20,
                           fontWeight: FontWeight.w400,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+
+                    // Memo (smaller, grey)
+                    if (widget.alarm.memo?.isNotEmpty == true) ...[
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Text(
+                          widget.alarm.memo!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color:    Color(0xFF666666),
+                            fontSize: 14,
+                            height:   1.5,
+                          ),
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
+              ),
 
-                const SizedBox(height: 16),
+              // ── BOTTOM: buttons ────────────────────────
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  24, 0, 24,
+                  MediaQuery.of(context).padding.bottom + 32,
+                ),
+                child: Column(
+                  children: [
 
-                // ── Label ─────────────────────────────────
-                if (widget.alarm.label.isNotEmpty == true)
-                  Text(
-                    widget.alarm.label,
-                    style: const TextStyle(
-                      color:      Color(0xFFBBBBBB),
-                      fontSize:   18,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-
-                // ── Memo ──────────────────────────────────
-                if (widget.alarm.memo?.isNotEmpty == true) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.alarm.memo!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color:    Color(0xFF606060),
-                      fontSize: 14,
-                      height:   1.4,
-                    ),
-                  ),
-                ],
-
-                // ── Mission badge ─────────────────────────
-                if (widget.alarm.missions.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  if (widget.alarm.missions.length > 1)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        'Mission ${_missionIndex + 1} of ${widget.alarm.missions.length}',
-                        style: const TextStyle(
-                          color:    Color(0xFF606060),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD600).withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: const Color(0xFFFFD600).withValues(alpha: 0.25)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('🧩', style: TextStyle(fontSize: 13)),
-                        SizedBox(width: 6),
-                        Text(
-                          'Mission required to dismiss',
-                          style: TextStyle(
-                            color:      Color(0xFFFFD600),
-                            fontSize:   12,
-                            fontWeight: FontWeight.w600,
+                    // Mission progress indicator
+                    if (_hasMission &&
+                        widget.alarm.missions.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'Mission ${_missionIndex + 1} '
+                          'of ${widget.alarm.missions.length}',
+                          style: const TextStyle(
+                            color:    Color(0xFF555555),
+                            fontSize: 12,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
 
-                const Spacer(flex: 3),
-
-                // ── Start Mission button ───────────────────
-                SizedBox(
-                  width: double.infinity,
-                  height: 58,
-                  child: ElevatedButton(
-                    onPressed: _startMission,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFD600),
-                      foregroundColor: Colors.black,
-                      elevation:       0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30)),
-                    ),
-                    child: Text(
-                      widget.alarm.missions.isNotEmpty
-                          ? 'Start Mission'
-                          : 'Dismiss',
-                      style: const TextStyle(
-                        fontSize:   17,
-                        fontWeight: FontWeight.w700,
+                    // ── Start Mission (yellow pill) ──────
+                    SizedBox(
+                      width:  double.infinity,
+                      height: 58,
+                      child: ElevatedButton(
+                        onPressed: _startMission,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFD600),
+                          foregroundColor: Colors.black,
+                          elevation:       0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(32),
+                          ),
+                        ),
+                        child: Text(
+                          _hasMission ? 'Start Mission' : 'Dismiss',
+                          style: const TextStyle(
+                            fontSize:   18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+
+                    const SizedBox(height: 14),
+
+                    // ── Swipe to Snooze (dark pill) ──────
+                    if (widget.alarm.snoozeEnabled == true)
+                      _SwipeToSnooze(onSnooze: _snooze),
+
+                  ],
                 ),
-
-                const SizedBox(height: 16),
-
-                // ── Swipe to Snooze ───────────────────────
-                if (widget.alarm.snoozeEnabled && widget.alarm.snoozeCount < 3)
-                  _SwipeToSnooze(onSnooze: _snooze),
-
-                const SizedBox(height: 32),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -318,7 +278,10 @@ class _RingingScreenState extends State<RingingScreen>
   }
 }
 
-// ── Swipe to Snooze widget ────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// Swipe to Snooze widget — matches reference image exactly
+// Dark pill, moon icon on left, "SWIPE TO SNOOZE" text
+// ─────────────────────────────────────────────────────────
 
 class _SwipeToSnooze extends StatefulWidget {
   final VoidCallback onSnooze;
@@ -329,66 +292,63 @@ class _SwipeToSnooze extends StatefulWidget {
 }
 
 class _SwipeToSnoozeState extends State<_SwipeToSnooze> {
-  double _dragX    = 0;
+  double _dx        = 0;
   bool   _triggered = false;
-
-  static const double _height      = 56.0;
-  static const double _thumbSize   = 46.0;
-  static const double _triggerFrac = 0.65; // trigger at 65% of width
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final maxDrag = constraints.maxWidth - _thumbSize - 16;
-      final progress = (_dragX / maxDrag).clamp(0.0, 1.0);
+    return LayoutBuilder(builder: (_, constraints) {
+      final trackWidth = constraints.maxWidth;
+      final thumbSize  = 46.0;
+      final maxDx      = trackWidth - thumbSize - 8;
+      final progress   = (_dx / maxDx).clamp(0.0, 1.0);
 
       return Container(
-        height: _height,
+        height: 58,
         decoration: BoxDecoration(
           color: const Color(0xFF1C1C1C),
-          borderRadius: BorderRadius.circular(_height / 2),
-          border: Border.all(color: const Color(0xFF2A2A2A)),
+          borderRadius: BorderRadius.circular(32),
         ),
         child: Stack(
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.center,
           children: [
-            // Label text
-            Center(
-              child: AnimatedOpacity(
-                opacity: 1.0 - progress * 2,
-                duration: Duration.zero,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.bedtime_rounded,
-                        color: Color(0xFF606060), size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      'SWIPE TO SNOOZE',
-                      style: TextStyle(
-                        color:       Color(0xFF606060),
-                        fontSize:    12,
-                        fontWeight:  FontWeight.w600,
-                        letterSpacing: 1.2,
-                      ),
+
+            // Label — fades out as thumb slides
+            Opacity(
+              opacity: (1.0 - progress * 2.5).clamp(0.0, 1.0),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.bedtime_rounded,
+                    color: Color(0xFF888888),
+                    size:  16,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'SWIPE TO SNOOZE',
+                    style: TextStyle(
+                      color:       Color(0xFF888888),
+                      fontSize:    13,
+                      fontWeight:  FontWeight.w600,
+                      letterSpacing: 1.5,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
-            // Draggable thumb
+            // Draggable moon thumb
             Positioned(
-              left: 5 + _dragX,
+              left: 6 + _dx,
               child: GestureDetector(
                 onHorizontalDragUpdate: (details) {
                   if (_triggered) return;
                   setState(() {
-                    _dragX = (_dragX + details.delta.dx)
-                        .clamp(0.0, maxDrag);
+                    _dx = (_dx + details.delta.dx).clamp(0.0, maxDx);
                   });
-
-                  if (_dragX / maxDrag >= _triggerFrac) {
+                  // Trigger snooze at 65% swipe
+                  if (_dx / maxDx >= 0.65) {
                     _triggered = true;
                     HapticFeedback.heavyImpact();
                     widget.onSnooze();
@@ -396,20 +356,23 @@ class _SwipeToSnoozeState extends State<_SwipeToSnooze> {
                 },
                 onHorizontalDragEnd: (_) {
                   if (!_triggered) {
-                    setState(() => _dragX = 0);
+                    setState(() => _dx = 0);
                   }
                 },
                 child: Container(
-                  width:  _thumbSize,
-                  height: _thumbSize,
+                  width:  thumbSize,
+                  height: thumbSize,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E2E2E),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF3A3A3A)),
+                    color:  const Color(0xFF2E2E2E),
+                    shape:  BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF3A3A3A),
+                      width: 1,
+                    ),
                   ),
                   child: const Icon(
                     Icons.bedtime_rounded,
-                    color: Color(0xFF888888),
+                    color: Color(0xFFAAAAAA),
                     size:  20,
                   ),
                 ),

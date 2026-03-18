@@ -1,55 +1,77 @@
+import 'package:alarm/alarm.dart' as alarm_pkg;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'dart:async';
 
 import 'providers/alarm_provider.dart';
-import 'alarm/alarm_service.dart';
-import 'alarm/alarm_scheduler.dart';
-import 'services/alarm_service.dart' as db_service;
+import 'alarm/alarm_manager.dart';
+import 'services/alarm_storage.dart';
 import 'screens/alarm_list_screen.dart';
 import 'screens/shell_screens.dart';
+import 'screens/ringing_screen.dart';
 import 'theme/app_theme.dart';
 
-// ADD global navigator key
-final navigatorKey = GlobalKey<NavigatorState>();
+// Global navigator key - MUST be at top level
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Register the foreground task entry point
-  FlutterForegroundTask.initCommunicationPort();
+  // Initialize Alarm package
+  await AlarmManager.initialize();
 
-  // Init alarm service
-  await AlarmService.instance.init();
-
-  // Init scheduler
-  await AlarmScheduler.instance.init();
-
-  // Set navigator key for AlarmNavigator
-  AlarmNavigator.navigatorKey = navigatorKey;
-
-  // Reschedule all enabled alarms from DB
-  try {
-    await db_service.AlarmService.instance.init();
-    final alarms = db_service.AlarmService.instance.alarms;
-    for (final alarm in alarms) {
-      if (alarm.isEnabled) {
-        await AlarmScheduler.instance.schedule(alarm);
-      }
-    }
-  } catch (e) {
-    debugPrint('⚠️ Could not reschedule alarms: $e');
+  // Request exact alarm permission (Android 12+)
+  final hasPermission = await AlarmManager.checkPermission();
+  if (!hasPermission) {
+    await AlarmManager.requestPermission();
   }
 
   SystemChrome.setPreferredOrientations(
     [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown],
   );
+
   runApp(const ElevateApp());
 }
 
-class ElevateApp extends StatelessWidget {
+class ElevateApp extends StatefulWidget {
   const ElevateApp({super.key});
+
+  @override
+  State<ElevateApp> createState() => _ElevateAppState();
+}
+
+class _ElevateAppState extends State<ElevateApp> {
+  StreamSubscription<alarm_pkg.AlarmSettings>? _alarmSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for alarm firing — THIS IS THE KEY PIECE
+    _alarmSub = alarm_pkg.Alarm.ringStream.stream.listen(_onAlarmRing);
+  }
+
+  @override
+  void dispose() {
+    _alarmSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _onAlarmRing(alarm_pkg.AlarmSettings settings) async {
+    // Load full alarm data from storage
+    final alarm = await AlarmStorage.getByNumericId(settings.id);
+    if (alarm == null) return;
+
+    // Push RingingScreen on top of whatever is showing
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => RingingScreen(
+          alarm:         alarm,
+          alarmSettings: settings,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +82,7 @@ class ElevateApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        navigatorKey: navigatorKey,
+        navigatorKey: navigatorKey, // ← MUST have this
         title: 'Elevate',
         debugShowCheckedModeBanner: false,
         themeMode: ThemeMode.dark,

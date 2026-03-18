@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../models/alarm.dart';
-import '../services/alarm_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/alarm_card.dart';
 import '../widgets/expandable_fab.dart';
+import '../services/alarm_storage.dart';
+import '../alarm/alarm_manager.dart';
 import 'edit_alarm_screen.dart';
 import 'quick_alarm_screen.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:permission_handler/permission_handler.dart';
-import '../alarm/alarm_service.dart' as background_alarm;
 
 class AlarmListScreen extends StatefulWidget {
   const AlarmListScreen({super.key});
@@ -20,68 +18,58 @@ class AlarmListScreen extends StatefulWidget {
 
 class _AlarmListScreenState extends State<AlarmListScreen> {
   List<Alarm> _alarms = [];
-  bool _isLoading = true;
+  bool        _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _requestPermissions();
-    _initForegroundTaskListener();
     _loadAlarms();
   }
 
-  Future<void> _requestPermissions() async {
-    // Notification permission
-    await Permission.notification.request();
-
-    // Exact alarm permission
-    await Permission.scheduleExactAlarm.request();
-
-    // Battery optimization — needed to keep service alive
-    await FlutterForegroundTask.requestIgnoreBatteryOptimization();
-  }
-
-  void _initForegroundTaskListener() {
-    // Listen for foreground task button taps
-    FlutterForegroundTask.addTaskDataCallback((data) {
-      if (data == 'dismiss') {
-        background_alarm.AlarmService.stopRinging();
-      } else if (data == 'snooze') {
-        background_alarm.AlarmService.instance.snooze(5);
-      }
-    });
-  }
-
   Future<void> _loadAlarms() async {
-    await AlarmService.instance.init();
+    if (mounted) {
+      setState(() => _loading = true);
+    }
+    final alarms = await AlarmStorage.loadList();
     if (mounted) {
       setState(() {
-        _alarms = AlarmService.instance.alarms.toList();
-        _isLoading = false;
+        _alarms  = alarms;
+        _loading = false;
       });
     }
   }
 
-  void _refreshAlarms() {
-    setState(() {
-      _alarms = AlarmService.instance.alarms.toList();
-    });
-  }
-
   Future<void> _openNewAlarm(BuildContext context) async {
-    final result = await Navigator.push<Alarm>(
+    Navigator.push(
       context,
       _smoothSlideRoute(const EditAlarmScreen()),
-    );
-    if (result != null && mounted) _refreshAlarms();
+    ).then((_) => _loadAlarms()); // ← reload when done
   }
 
   Future<void> _openEditAlarm(BuildContext context, Alarm alarm) async {
-    final result = await Navigator.push<Alarm>(
+    Navigator.push(
       context,
       _smoothSlideRoute(EditAlarmScreen(alarmId: alarm.id)),
-    );
-    if (result != null && mounted) _refreshAlarms();
+    ).then((_) => _loadAlarms()); // ← reload when done
+  }
+
+  // Toggle alarm on/off
+  Future<void> _toggleAlarm(Alarm alarm) async {
+    final updated = alarm.copyWith(isEnabled: !alarm.isEnabled);
+    await AlarmStorage.save(updated);
+    if (updated.isEnabled) {
+      await AlarmManager.schedule(updated);
+    } else {
+      await AlarmManager.cancel(updated);
+    }
+    _loadAlarms(); // refresh list
+  }
+
+  // Delete alarm
+  Future<void> _deleteAlarm(Alarm alarm) async {
+    await AlarmManager.cancel(alarm);
+    await AlarmStorage.delete(alarm.id);
+    _loadAlarms(); // refresh list
   }
 
   PageRouteBuilder<T> _smoothSlideRoute<T>(Widget page) {
@@ -120,42 +108,6 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, Alarm alarm) async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1F1F1F),
-        title: const Text('Delete alarm?'),
-        content: const Text(
-          'This alarm will be removed and will no longer trigger.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: ElevateTheme.warning),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await AlarmService.instance.deleteAlarm(alarm.id);
-      _refreshAlarms();
-    }
-  }
-
-  Future<void> _toggleAlarm(String id, bool isEnabled) async {
-    await AlarmService.instance.toggleAlarm(id, isEnabled);
-    _refreshAlarms();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -184,7 +136,7 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        if (_isLoading) {
+                        if (_loading) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
@@ -201,9 +153,9 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                             final alarm = _alarms[index];
                             return AlarmCard(
                               alarm: alarm,
-                              onToggle: (newValue) => _toggleAlarm(alarm.id, newValue),
+                              onToggle: (_) => _toggleAlarm(alarm),
                               onTap: () => _openEditAlarm(context, alarm),
-                              onDelete: () => _confirmDelete(context, alarm),
+                              onDelete: () => _deleteAlarm(alarm),
                             );
                           },
                         );
@@ -215,9 +167,7 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
             ),
           ),
           ExpandableFab(
-            onAlarm: () async {
-              await _openNewAlarm(context);
-            },
+            onAlarm: () => _openNewAlarm(context),
             onQuickAlarm: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(
@@ -225,6 +175,7 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
                   fullscreenDialog: true,
                 ),
               );
+              _loadAlarms(); // refresh after quick alarm
             },
           ),
         ],
