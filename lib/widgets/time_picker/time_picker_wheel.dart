@@ -57,12 +57,12 @@ class _TimePickerWheelState extends State<TimePickerWheel> {
     super.initState();
     final h = widget.initialTime.hour;
     _isAM         = h < 12;
-    _selectedHour = h % 12 == 0 ? 12 : h % 12;
+    _selectedHour   = h % 12 == 0 ? 12 : h % 12;
     _selectedMinute = widget.initialTime.minute;
 
     // Start in the MIDDLE of each large list + offset to real value
     _hourController = FixedExtentScrollController(
-      initialItem: _hourMiddle + (_selectedHour - 1),
+      initialItem: _hourMiddle + (_selectedHour % 12),
     );
     _minuteController = FixedExtentScrollController(
       initialItem: _minuteMiddle + _selectedMinute,
@@ -70,6 +70,36 @@ class _TimePickerWheelState extends State<TimePickerWheel> {
     _amPmController = FixedExtentScrollController(
       initialItem: _isAM ? 0 : 1,
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant TimePickerWheel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTime != widget.initialTime) {
+      final h = widget.initialTime.hour;
+      setState(() {
+        _isAM           = h < 12;
+        _selectedHour   = h % 12 == 0 ? 12 : h % 12;
+        _selectedMinute = widget.initialTime.minute;
+      });
+
+      // Jump or animate to new time (Animate is smoother for UX)
+      _hourController.animateToItem(
+        _hourMiddle + (_selectedHour % 12),
+        duration: const Duration(milliseconds: 400),
+        curve:    Curves.easeOutCubic,
+      );
+      _minuteController.animateToItem(
+        _minuteMiddle + _selectedMinute,
+        duration: const Duration(milliseconds: 400),
+        curve:    Curves.easeOutCubic,
+      );
+      _amPmController.animateToItem(
+        _isAM ? 0 : 1,
+        duration: const Duration(milliseconds: 400),
+        curve:    Curves.easeOutCubic,
+      );
+    }
   }
 
   @override

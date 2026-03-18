@@ -10,7 +10,6 @@ class Alarm {
   bool isEnabled;
   final Set<int> selectedDays; // 0=Sun, 1=Mon, ..., 6=Sat
 
-  final List<String> missionIds;
   final String vibrationId;
   final bool vibrationEnabled;
   final int snoozeMinutes;
@@ -36,7 +35,6 @@ class Alarm {
     this.soundEnabled = true,
     this.isEnabled = true,
     this.selectedDays = const {},
-    this.missionIds = const [],
     this.vibrationId = 'basic',
     this.vibrationEnabled = true,
     this.snoozeMinutes = 5,
@@ -63,7 +61,6 @@ class Alarm {
       'soundEnabled': soundEnabled,
       'isEnabled': isEnabled,
       'selectedDays': selectedDays.toList(),
-      'missionIds': missionIds,
       'vibrationId': vibrationId,
       'vibrationEnabled': vibrationEnabled,
       'snoozeMinutes': snoozeMinutes,
@@ -91,7 +88,6 @@ class Alarm {
       soundEnabled: json['soundEnabled'] as bool? ?? true,
       isEnabled: json['isEnabled'] as bool? ?? json['enabled'] as bool? ?? true,
       selectedDays: Set<int>.from(json['selectedDays'] ?? json['repeatDays'] ?? []),
-      missionIds: List<String>.from(json['missionIds'] ?? (json['missionId'] != null ? [json['missionId']] : [])),
       vibrationId: json['vibrationId'] as String? ?? json['vibrationPattern'] as String? ?? 'basic',
       vibrationEnabled: json['vibrationEnabled'] as bool? ?? json['vibration'] as bool? ?? true,
       snoozeMinutes: json['snoozeMinutes'] as int? ?? 5,
@@ -103,9 +99,7 @@ class Alarm {
           ? (json['missions'] as List<dynamic>)
               .map((m) => Map<String, dynamic>.from(m as Map))
               .toList()
-          : (json['missionData'] != null
-              ? [Map<String, dynamic>.from(json['missionData'] as Map)]
-              : []),
+          : [],
       volume: json['volume'] as int? ?? 50,
       snoozeEnabled: json['snoozeEnabled'] as bool? ?? false,
       snoozeCount: json['snoozeCount'] as int? ?? 0,
@@ -121,7 +115,6 @@ class Alarm {
     bool? soundEnabled,
     bool? isEnabled,
     Set<int>? selectedDays,
-    List<String>? missionIds,
     String? vibrationId,
     bool? vibrationEnabled,
     int? snoozeMinutes,
@@ -143,7 +136,6 @@ class Alarm {
       soundEnabled: soundEnabled ?? this.soundEnabled,
       isEnabled: isEnabled ?? this.isEnabled,
       selectedDays: selectedDays ?? this.selectedDays,
-      missionIds: missionIds ?? this.missionIds,
       vibrationId: vibrationId ?? this.vibrationId,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
       snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,

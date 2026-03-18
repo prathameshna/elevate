@@ -47,30 +47,25 @@ class _ElevateAppState extends State<ElevateApp> {
   @override
   void initState() {
     super.initState();
-    // Listen for alarm firing — THIS IS THE KEY PIECE
-    _alarmSub = alarm_pkg.Alarm.ringStream.stream.listen(_onAlarmRing);
+    _alarmSub = alarm_pkg.Alarm.ringStream.stream.listen((alarm_pkg.AlarmSettings settings) async {
+      final alarm = await AlarmStorage.getByNumericId(settings.id);
+      if (alarm == null) return;
+
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => RingingScreen(
+            alarm:         alarm,
+            alarmSettings: settings,
+          ),
+        ),
+      );
+    });
   }
 
   @override
   void dispose() {
     _alarmSub?.cancel();
     super.dispose();
-  }
-
-  Future<void> _onAlarmRing(alarm_pkg.AlarmSettings settings) async {
-    // Load full alarm data from storage
-    final alarm = await AlarmStorage.getByNumericId(settings.id);
-    if (alarm == null) return;
-
-    // Push RingingScreen on top of whatever is showing
-    navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) => RingingScreen(
-          alarm:         alarm,
-          alarmSettings: settings,
-        ),
-      ),
-    );
   }
 
   @override

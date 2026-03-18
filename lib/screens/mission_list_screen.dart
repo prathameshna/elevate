@@ -26,26 +26,6 @@ class MissionDefinition {
 }
 
 const List<MissionDefinition> kAllMissions = [
-  // ── Popular ────────────────────────────────────────────
-  MissionDefinition(
-    id:           'household_hunt',
-    name:         'Household Item Hunt',
-    icon:         Icons.search_rounded,
-    iconBgColor:  Color(0xFF8B1A1A),
-    badge:        'AI',
-    badgeColor:   Color(0xFF8B6914),
-    isLocked:     true,
-    isBuilt:      false,
-  ),
-  MissionDefinition(
-    id:           'tap_challenge',
-    name:         'Tap Challenge',
-    icon:         Icons.touch_app_rounded,
-    iconBgColor:  Color(0xFF8B1A1A),
-    isLocked:     true,
-    isBuilt:      false,
-  ),
-
   // ── Wake your brain ────────────────────────────────────
   MissionDefinition(
     id:           'colour_tiles',
@@ -53,61 +33,7 @@ const List<MissionDefinition> kAllMissions = [
     icon:         Icons.grid_view_rounded,
     iconBgColor:  Color(0xFF0D5C63),
     isLocked:     false,
-    isBuilt:      true,   // ← has challenge screen
-  ),
-  MissionDefinition(
-    id:           'typing',
-    name:         'Typing',
-    icon:         Icons.keyboard_rounded,
-    iconBgColor:  Color(0xFF0D5C63),
-    isLocked:     true,
-    isBuilt:      false,
-  ),
-  MissionDefinition(
-    id:           'math',
-    name:         'Math',
-    icon:         Icons.calculate_rounded,
-    iconBgColor:  Color(0xFF0D5C63),
-    badge:        'BEST',
-    badgeColor:   Color(0xFFB8860B),
-    isLocked:     true,
-    isBuilt:      false,
-  ),
-
-  // ── Wake your body ─────────────────────────────────────
-  MissionDefinition(
-    id:           'step',
-    name:         'Step',
-    icon:         Icons.directions_walk_rounded,
-    iconBgColor:  Color(0xFF5B2D8E),
-    badge:        'HOT',
-    badgeColor:   Color(0xFF8B1A1A),
-    isLocked:     true,
-    isBuilt:      false,
-  ),
-  MissionDefinition(
-    id:           'qr_barcode',
-    name:         'QR / Barcode',
-    icon:         Icons.qr_code_scanner_rounded,
-    iconBgColor:  Color(0xFF5B2D8E),
-    isLocked:     true,
-    isBuilt:      false,
-  ),
-  MissionDefinition(
-    id:           'shake',
-    name:         'Shake',
-    icon:         Icons.vibration_rounded,
-    iconBgColor:  Color(0xFFB85C00),
-    isLocked:     true,
-    isBuilt:      false,
-  ),
-  MissionDefinition(
-    id:           'squat',
-    name:         'Squat',
-    icon:         Icons.fitness_center_rounded,
-    iconBgColor:  Color(0xFF1A6B3C),
-    isLocked:     true,
-    isBuilt:      false,
+    isBuilt:      true,   // ← current built mission
   ),
 ];
 
@@ -141,24 +67,9 @@ class MissionListScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
 
-          // ── Popular missions ──────────────────────
-          _SectionHeader('Popular mission'),
-          ..._missionsWhere((m) => ['household_hunt', 'tap_challenge']
-              .contains(m.id), context),
-
-          const SizedBox(height: 24),
-
           // ── Wake your brain ───────────────────────
-          _SectionHeader('Wake your brain'),
-          ..._missionsWhere((m) => ['colour_tiles', 'typing', 'math']
-              .contains(m.id), context),
-
-          const SizedBox(height: 24),
-
-          // ── Wake your body ────────────────────────
-          _SectionHeader('Wake your body'),
-          ..._missionsWhere((m) => ['step', 'qr_barcode', 'shake', 'squat']
-              .contains(m.id), context),
+          const _SectionHeader('Wake your brain'),
+          ..._missionsWhere((m) => m.id == 'colour_tiles', context),
 
           const SizedBox(height: 32),
 

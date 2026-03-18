@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
-import 'package:just_audio/just_audio.dart';
+import 'package:alarm/alarm.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,12 +26,10 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   String  _activeTab      = 'Ringtones';
   String  _activeCategory = 'Bright';
   String? _selectedSoundId;
-  String? _playingSoundId;
+  String? _previewingFile;
   bool    _isRandom       = false;
   bool    _gradualVolume  = true;
   double  _volume         = 0.8;
-
-  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // My Music state
   List<MyMusicTrack> _myMusicTracks = [];
@@ -54,17 +52,11 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
     _selectedSoundId = widget.initialSoundId;
     _loadSoundEnabled();
     _loadMyMusicTracks();
-    _audioPlayer.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) {
-        if (mounted) setState(() => _playingSoundId = null);
-      }
-    });
   }
 
   @override
   void dispose() {
-    _audioPlayer.stop();
-    _audioPlayer.dispose();
+    Alarm.stop(99999);
     super.dispose();
   }
 
@@ -105,9 +97,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
       if (!value) _isMuted = false;
     });
     if (!value) {
-      await _audioPlayer.stop();
-      setState(() => _playingSoundId = null);
-      await _audioPlayer.setVolume(_volume); // restore volume for next time
+      await _stopPreview();
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('sound_enabled', value);
@@ -116,39 +106,42 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   Future<void> _toggleMute() async {
     HapticFeedback.lightImpact();
     setState(() => _isMuted = !_isMuted);
-
-    if (_isMuted) {
-      await _audioPlayer.setVolume(0.0);   // silence but don't stop
-    } else {
-      await _audioPlayer.setVolume(_volume); // restore saved volume
-    }
+    // Note: alarm preview volume doesn't have a direct mute-toggle while running
+    // but we respect _isMuted globally if needed.
   }
 
-  // ── Audio preview ─────────────────────────────────────────
-
-  Future<void> _previewSound(SoundItem sound) async {
+  Future<void> _previewSound(String soundFile) async {
     if (!_soundEnabled) return;
-    await _audioPlayer.stop();
-    setState(() => _playingSoundId = sound.id);
-    try {
-      await _audioPlayer.setAsset('assets/sounds/${sound.file}');
-      await _audioPlayer.play();
-    } catch (_) {
-      // File not yet added — fail silently
-      if (mounted) setState(() => _playingSoundId = null);
-    }
+    await _stopPreview();
+    setState(() => _previewingFile = soundFile);
+
+    final previewTime = DateTime.now().add(const Duration(seconds: 1));
+    await Alarm.set(
+      alarmSettings: AlarmSettings(
+        id:             99999,
+        dateTime:       previewTime,
+        assetAudioPath: 'assets/sounds/$soundFile',
+        loopAudio:      false,
+        vibrate:        false,
+        volume:         _volume,
+        fadeDuration:   0,
+        warningNotificationOnKill: false,
+        androidFullScreenIntent:   false,
+        notificationSettings: const NotificationSettings(
+          title: 'Sound Preview',
+          body:  '',
+          icon:  'notification_icon',
+          stopButton: 'Stop',
+        ),
+      ),
+    );
+
+    Future.delayed(const Duration(seconds: 5), _stopPreview);
   }
 
-  Future<void> _previewMyMusicTrack(MyMusicTrack track) async {
-    if (!_soundEnabled) return;
-    await _audioPlayer.stop();
-    setState(() => _playingSoundId = track.id);
-    try {
-      await _audioPlayer.setFilePath(track.filePath);
-      await _audioPlayer.play();
-    } catch (_) {
-      if (mounted) setState(() => _playingSoundId = null);
-    }
+  Future<void> _stopPreview() async {
+    await Alarm.stop(99999);
+    if (mounted) setState(() => _previewingFile = null);
   }
 
   // ── Helpers ───────────────────────────────────────────────
@@ -164,7 +157,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
     if (_isRandom) {
       final pick = sounds[Random().nextInt(sounds.length)];
       setState(() => _selectedSoundId = pick.id);
-      _previewSound(pick);
+      _previewSound(pick.file);
     }
   }
 
@@ -200,7 +193,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
 
         // Auto-select and preview the new track
         setState(() => _selectedSoundId = track.id);
-        _previewMyMusicTrack(track);
+        _previewSound(track.filePath);
       }
     } catch (e) {
       if (mounted) {
@@ -222,9 +215,8 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
     if (_selectedSoundId == track.id) {
       setState(() => _selectedSoundId = null);
     }
-    if (_playingSoundId == track.id) {
-      await _audioPlayer.stop();
-      setState(() => _playingSoundId = null);
+    if (_previewingFile == track.filePath) {
+      await _stopPreview();
     }
     setState(() => _myMusicTracks.removeWhere((t) => t.id == track.id));
     await _saveMyMusicTracks();
@@ -501,7 +493,6 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
         itemBuilder: (context, index) {
           final sound = _currentSounds[index];
           final isSelected = _selectedSoundId == sound.id;
-          final isPlaying  = _playingSoundId  == sound.id;
 
           return GestureDetector(
             onTap: () {
@@ -510,11 +501,15 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
                 _selectedSoundId = sound.id;
                 _isRandom = false;
               });
-              _previewSound(sound);
+              if (_previewingFile == sound.file) {
+                _stopPreview();
+              } else {
+                _previewSound(sound.file);
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 4, vertical: 16),
+                  horizontal: 4, vertical: 12),
               decoration: const BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
@@ -525,13 +520,27 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
               ),
               child: Row(
                 children: [
-                  // Animated wave bars when playing
-                  SizedBox(
-                    width: 28,
-                    child: isPlaying
-                        ? const _PlayingWaveIcon()
-                        : const SizedBox.shrink(),
+                  // Play/Stop preview button
+                  IconButton(
+                    icon: Icon(
+                      _previewingFile == sound.file
+                          ? Icons.stop_circle_rounded
+                          : Icons.play_circle_rounded,
+                      color: _previewingFile == sound.file
+                          ? const Color(0xFFFFD600)
+                          : const Color(0xFF606060),
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      if (_previewingFile == sound.file) {
+                        _stopPreview();
+                      } else {
+                        _previewSound(sound.file);
+                      }
+                    },
                   ),
+
+                  const SizedBox(width: 8),
 
                   // Sound name
                   Expanded(
@@ -653,7 +662,6 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
 
   Widget _buildMyMusicTrackRow(MyMusicTrack track) {
     final isSelected = _selectedSoundId == track.id;
-    final isPlaying  = _playingSoundId  == track.id;
 
     return Dismissible(
       key: ValueKey(track.id),
@@ -673,11 +681,15 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
         onTap: () {
           HapticFeedback.selectionClick();
           setState(() => _selectedSoundId = track.id);
-          _previewMyMusicTrack(track);
+          if (_previewingFile == track.filePath) {
+            _stopPreview();
+          } else {
+            _previewSound(track.filePath); // Using the same preview logic
+          }
         },
         child: Container(
           padding: const EdgeInsets.symmetric(
-              horizontal: 4, vertical: 14),
+              horizontal: 4, vertical: 12),
           decoration: const BoxDecoration(
             border: Border(
               bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1),
@@ -685,28 +697,26 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
           ),
           child: Row(
             children: [
-              // Music note icon
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFFFD600).withValues(alpha: 0.15)
-                      : const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(8),
-                  border: isSelected
-                      ? Border.all(
-                          color: const Color(0xFFFFD600).withValues(alpha: 0.4))
-                      : null,
+              // Play/Stop button
+              IconButton(
+                icon: Icon(
+                  _previewingFile == track.filePath
+                      ? Icons.stop_circle_rounded
+                      : Icons.play_circle_rounded,
+                  color: _previewingFile == track.filePath
+                      ? const Color(0xFFFFD600)
+                      : const Color(0xFF606060),
+                  size: 28,
                 ),
-                child: isPlaying
-                    ? const Center(child: _PlayingWaveIcon())
-                    : Icon(Icons.music_note_rounded,
-                        color: isSelected
-                            ? const Color(0xFFFFD600)
-                            : const Color(0xFF606060),
-                        size: 18),
+                onPressed: () {
+                  if (_previewingFile == track.filePath) {
+                    _stopPreview();
+                  } else {
+                    _previewSound(track.filePath);
+                  }
+                },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
 
               // Track name
               Expanded(
@@ -831,7 +841,6 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
                         max: 1,
                         onChanged: (v) {
                           setState(() => _volume = v);
-                          if (!_isMuted) _audioPlayer.setVolume(v);
                         },
                       ),
                     ),
@@ -846,57 +855,3 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   }
 }
 
-// ── Animated Playing Wave Icon ─────────────────────────────
-
-class _PlayingWaveIcon extends StatefulWidget {
-  const _PlayingWaveIcon();
-
-  @override
-  State<_PlayingWaveIcon> createState() => _PlayingWaveIconState();
-}
-
-class _PlayingWaveIconState extends State<_PlayingWaveIcon>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, _) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: List.generate(3, (i) {
-            final height = 6.0 +
-                (i.isEven ? _ctrl.value : 1 - _ctrl.value) * 12.0;
-            return Container(
-              width: 3,
-              height: height,
-              margin: const EdgeInsets.symmetric(horizontal: 1),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD600),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-}
