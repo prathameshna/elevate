@@ -44,7 +44,7 @@ class Alarm {
     this.memoText,
     this.missions = const [],
     this.volume = 50,
-    this.snoozeEnabled = false,
+    this.snoozeEnabled = true,
     this.snoozeCount = 0,
   });
 
@@ -101,7 +101,7 @@ class Alarm {
               .toList()
           : [],
       volume: json['volume'] as int? ?? 50,
-      snoozeEnabled: json['snoozeEnabled'] as bool? ?? false,
+      snoozeEnabled: json['snoozeEnabled'] as bool? ?? true,
       snoozeCount: json['snoozeCount'] as int? ?? 0,
     );
   }

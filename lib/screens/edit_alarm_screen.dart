@@ -126,6 +126,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
           _snoozeMinutes = alarm.snoozeMinutes;
           _memoText = alarm.memo ?? '';
           _selectedSoundFile = alarm.soundFile;
+          _selectedSoundId = alarm.soundId;
           _snoozeEnabled = alarm.snoozeEnabled;
           _isLoading = false;
           _memoController.text = _memoText;
@@ -148,17 +149,29 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
 
   String _getSoundName() {
-    if (_selectedSoundId == null || _selectedSoundId == 'default_alarm') return 'Default';
-    for (final sounds in soundLibrary.values) {
-      for (final s in sounds) {
-        if (s.id == _selectedSoundId) return s.name;
+    // Check by ID first
+    if (_selectedSoundId != null && _selectedSoundId != 'default_alarm') {
+      for (final sounds in soundLibrary.values) {
+        for (final s in sounds) {
+          if (s.id == _selectedSoundId) return s.name;
+        }
+      }
+      for (final track in _myMusicTracks) {
+        if (track.id == _selectedSoundId) return track.name;
+      }
+      if (_selectedSoundId!.startsWith('my_')) return 'Custom Sound';
+    }
+
+    // Fallback: check by file name
+    if (_selectedSoundFile != null && _selectedSoundFile!.isNotEmpty) {
+      for (final sounds in soundLibrary.values) {
+        for (final s in sounds) {
+          if (s.file == _selectedSoundFile) return s.name;
+        }
       }
     }
-    for (final track in _myMusicTracks) {
-      if (track.id == _selectedSoundId) return track.name;
-    }
-    if (_selectedSoundId!.startsWith('my_')) return 'Custom Sound';
-    return _selectedSoundId!;
+
+    return 'Default';
   }
 
   String _getVibrationName() {
@@ -248,6 +261,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         isEnabled:         _isEnabled,
         label:             '', 
         memoText:          _memoController.text.trim(),
+        soundId:           _selectedSoundId,
         soundFile:         _selectedSoundFile ?? 'bright_bell.mp3',
         soundEnabled:      true,
         vibrationId:       _selectedVibrationId,

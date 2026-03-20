@@ -27,6 +27,9 @@ class _RingingScreenState extends State<RingingScreen>
   int  _missionIndex = 0;
   bool _dismissed    = false;
 
+  // Snooze button press animation
+
+
   @override
   void initState() {
     super.initState();
@@ -115,12 +118,15 @@ class _RingingScreenState extends State<RingingScreen>
     return '${days[n.weekday - 1]}, ${n.day} ${months[n.month - 1]} ${n.year}';
   }
 
-  bool get _hasMission => widget.alarm.missions.isNotEmpty;
-
   // ── Build ─────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final missions      = widget.alarm.missions;
+    final hasMission    = missions.isNotEmpty;
+    final snoozeEnabled = widget.alarm.snoozeEnabled;
+    final isAm          = widget.alarm.time.period == DayPeriod.am;
+
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -131,59 +137,63 @@ class _RingingScreenState extends State<RingingScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-  
-                // ── Spacer: small gap from top ─────────────
-                const SizedBox(height: 48),
-  
-                // ── Date ───────────────────────────────────
-                // Small, grey, centered — matches Image 2
+
+                const SizedBox(height: 32),
+
+                // ── Date ──────────────────────────────────
                 Text(
                   _dateString,
                   style: const TextStyle(
-                    color:      Color(0xFF888888),
-                    fontSize:   15,
-                    fontWeight: FontWeight.w400,
+                    color:         Color(0xFF888888),
+                    fontSize:      15,
+                    fontWeight:    FontWeight.w400,
                     letterSpacing: 0.2,
                   ),
                 ),
-  
+
                 const SizedBox(height: 8),
-  
-                // ── Time ───────────────────────────────────
-                // Smaller than current — weight 700, NOT w900
-                // Image 2 shows "7:24" style — not full screen giant
+
+                // ── Time ──────────────────────────────────
                 Text(
                   _timeString,
                   style: const TextStyle(
-                    color:       Color(0xFFF5F5F5),
-                    fontSize:    80,     // NOT 100+ like current
-                    fontWeight:  FontWeight.w900,
+                    color:         Color(0xFFF5F5F5),
+                    fontSize:      78,
+                    fontWeight:    FontWeight.w700,
                     letterSpacing: -2,
-                    height:      1.0,
+                    height:        1.0,
                   ),
                 ),
-  
-                const SizedBox(height: 32),
-  
-                // ── Alarm label ─────────────────────────────
-                // "Weekends alarm" — visible in Image 2
+
+                // ── AM / PM Badge ─────────────────────────
+                Text(
+                  isAm ? 'AM' : 'PM',
+                  style: const TextStyle(
+                    color:      Color(0xFF666666),
+                    fontSize:   18,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // ── Label ─────────────────────────────────
                 if (widget.alarm.label.isNotEmpty)
                   Text(
                     widget.alarm.label,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color:      Color(0xFFCCCCCC),
-                      fontSize:   20, // Slightly larger
+                      fontSize:   19,
                       fontWeight: FontWeight.w400,
-                      letterSpacing: 0.2,
                     ),
                   ),
-  
-                // ── Memo (if set) ───────────────────────────
+
+                // ── Memo ──────────────────────────────────
                 if (widget.alarm.memo?.isNotEmpty == true) ...[
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       widget.alarm.memo!,
                       textAlign: TextAlign.center,
@@ -195,25 +205,37 @@ class _RingingScreenState extends State<RingingScreen>
                     ),
                   ),
                 ],
-  
-                // ── Push buttons to bottom ──────────────────
-                const Spacer(),
-  
-                // ── Mission progress (if multiple) ──────────
-                if (widget.alarm.missions.length > 1)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(
-                      'Mission ${_missionIndex + 1} '
-                      'of ${widget.alarm.missions.length}',
-                      style: const TextStyle(
-                        color:    Color(0xFF555555),
-                        fontSize: 12,
+
+                // ── Mission Indicator ─────────────────────
+                if (hasMission) ...[
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width:  8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFD600),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${missions.length} mission${missions.length > 1 ? 's' : ''} • ${_getMissionName(missions[0])}',
+                        style: const TextStyle(
+                          color:      Color(0xFF888888),
+                          fontSize:   12,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
                   ),
-  
-                // ── Start Mission yellow pill ────────────────
+                ],
+
+                const Spacer(),
+
+                // ── Start Mission / Dismiss button ────────
                 SizedBox(
                   width:  double.infinity,
                   height: 56,
@@ -228,26 +250,22 @@ class _RingingScreenState extends State<RingingScreen>
                       ),
                     ),
                     child: Text(
-                      _hasMission ? 'Start Mission' : 'Dismiss',
+                      hasMission ? 'Start Mission' : 'Dismiss',
                       style: const TextStyle(
-                        fontSize:   17,
-                        fontWeight: FontWeight.w700,
+                        fontSize:      17,
+                        fontWeight:    FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
                     ),
                   ),
                 ),
-  
-                const SizedBox(height: 14),
-  
-                // ── Swipe to Snooze dark pill ────────────────
-                // Only show if snooze is enabled
-                if (widget.alarm.snoozeEnabled == true)
-                  _SwipeToSnooze(onSnooze: _snooze),
-  
-                // ── Bottom safe area padding ─────────────────
-                SizedBox(
-                  height: MediaQuery.of(context).padding.bottom + 24,
-                ),
+
+                const SizedBox(height: 12),
+
+                // ── Snooze Button (Professional) ──────────
+                if (snoozeEnabled) _SnoozeButton(onSnooze: _snooze),
+
+                const SizedBox(height: 36),
               ],
             ),
           ),
@@ -255,96 +273,137 @@ class _RingingScreenState extends State<RingingScreen>
       ),
     );
   }
+
+  String _getMissionName(Map<String, dynamic> mission) {
+    final type = mission['type'] as String? ?? '';
+    switch (type) {
+      case 'colour_tiles': return 'Colour Tiles';
+      case 'math':         return 'Math';
+      case 'shake':        return 'Shake';
+      default:             return 'Challenge';
+    }
+  }
 }
 
-// ── Swipe to Snooze ───────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// Professional Snooze Button
+// Two-part row: moon icon pill + "5 min" label + divider + "Snooze" text.
+// Uses GestureDetector for a custom press-down scale animation.
+// ─────────────────────────────────────────────────────────
 
-class _SwipeToSnooze extends StatefulWidget {
+class _SnoozeButton extends StatefulWidget {
   final VoidCallback onSnooze;
-  const _SwipeToSnooze({required this.onSnooze});
+  const _SnoozeButton({required this.onSnooze});
 
   @override
-  State<_SwipeToSnooze> createState() => _SwipeToSnoozeState();
+  State<_SnoozeButton> createState() => _SnoozeButtonState();
 }
 
-class _SwipeToSnoozeState extends State<_SwipeToSnooze> {
-  double _dx        = 0;
-  bool   _triggered = false;
+class _SnoozeButtonState extends State<_SnoozeButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double>   _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 90),
+      reverseDuration: const Duration(milliseconds: 160),
+      lowerBound: 0.0,
+      upperBound: 1.0,
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(_) => _ctrl.forward();
+  void _onTapUp(_)   { _ctrl.reverse(); widget.onSnooze(); }
+  void _onTapCancel() => _ctrl.reverse();
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (_, c) {
-      final maxDx = c.maxWidth - 52;
-
-      return Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color:        const Color(0xFF1C1C1C),
-          borderRadius: BorderRadius.circular(32),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-
-            // "SWIPE TO SNOOZE" label — fades as thumb moves
-            Opacity(
-              opacity: (1.0 - (_dx / maxDx) * 2.5).clamp(0.0, 1.0),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.bedtime_rounded,
-                      color: Color(0xFF888888), size: 15),
-                  SizedBox(width: 8),
-                  Text(
-                    'SWIPE TO SNOOZE',
-                    style: TextStyle(
-                      color:       Color(0xFF888888),
-                      fontSize:    13,
-                      fontWeight:  FontWeight.w600,
-                      letterSpacing: 1.4,
-                    ),
-                  ),
-                ],
-              ),
+    return GestureDetector(
+      onTapDown:   _onTapDown,
+      onTapUp:     _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          height:     54,
+          decoration: BoxDecoration(
+            color:        const Color(0xFF131313),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: const Color(0xFF2A2A2A),
+              width: 1,
             ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
 
-            // Moon icon thumb — draggable
-            Positioned(
-              left: 5 + _dx,
-              child: GestureDetector(
-                onHorizontalDragUpdate: (d) {
-                  if (_triggered) return;
-                  setState(() {
-                    _dx = (_dx + d.delta.dx).clamp(0.0, maxDx);
-                  });
-                  if (_dx / maxDx >= 0.65) {
-                    _triggered = true;
-                    HapticFeedback.heavyImpact();
-                    widget.onSnooze();
-                  }
-                },
-                onHorizontalDragEnd: (_) {
-                  if (!_triggered) setState(() => _dx = 0);
-                },
-                child: Container(
-                  width:  46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color:  const Color(0xFF2A2A2A),
-                    shape:  BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF383838)),
-                  ),
-                  child: const Icon(
-                    Icons.bedtime_rounded,
-                    color: Color(0xFFAAAAAA),
-                    size:  20,
-                  ),
+              // ── Moon icon in a small pill ──────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color:        const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.bedtime_rounded,
+                      color: Color(0xFF666666),
+                      size:  14,
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      '5 min',
+                      style: TextStyle(
+                        color:      Color(0xFF666666),
+                        fontSize:   12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+
+              const SizedBox(width: 12),
+
+              // ── Vertical divider ───────────────────────
+              Container(
+                width:  1,
+                height: 20,
+                color:  const Color(0xFF252525),
+              ),
+
+              const SizedBox(width: 12),
+
+              // ── "Snooze" label ─────────────────────────
+              const Text(
+                'Snooze',
+                style: TextStyle(
+                  color:         Color(0xFF888888),
+                  fontSize:      15,
+                  fontWeight:    FontWeight.w500,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    });
+      ),
+    );
   }
 }
