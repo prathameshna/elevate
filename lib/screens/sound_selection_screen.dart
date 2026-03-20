@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
-import 'package:alarm/alarm.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +30,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   bool    _isRandom       = false;
   bool    _gradualVolume  = true;
   double  _volume         = 0.8;
+  AudioPlayer? _audioPlayer;
 
   // My Music state
   List<MyMusicTrack> _myMusicTracks = [];
@@ -56,7 +57,8 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
 
   @override
   void dispose() {
-    Alarm.stop(99999);
+    _audioPlayer?.stop();
+    _audioPlayer?.dispose();
     super.dispose();
   }
 
@@ -115,32 +117,23 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
     await _stopPreview();
     setState(() => _previewingFile = soundFile);
 
-    final previewTime = DateTime.now().add(const Duration(seconds: 1));
-    await Alarm.set(
-      alarmSettings: AlarmSettings(
-        id:             99999,
-        dateTime:       previewTime,
-        assetAudioPath: 'assets/sounds/$soundFile',
-        loopAudio:      false,
-        vibrate:        false,
-        volume:         _volume,
-        fadeDuration:   0,
-        warningNotificationOnKill: false,
-        androidFullScreenIntent:   false,
-        notificationSettings: const NotificationSettings(
-          title: 'Sound Preview',
-          body:  '',
-          icon:  'notification_icon',
-          stopButton: 'Stop',
-        ),
-      ),
-    );
+    try {
+      _audioPlayer = AudioPlayer();
+      await _audioPlayer!.setAsset('assets/sounds/$soundFile');
+      await _audioPlayer!.setVolume(_volume);
+      await _audioPlayer!.play();
 
-    Future.delayed(const Duration(seconds: 5), _stopPreview);
+      // Auto stop after 5 seconds
+      Future.delayed(const Duration(seconds: 5), _stopPreview);
+    } catch (e) {
+      setState(() => _previewingFile = null);
+    }
   }
 
   Future<void> _stopPreview() async {
-    await Alarm.stop(99999);
+    await _audioPlayer?.stop();
+    await _audioPlayer?.dispose();
+    _audioPlayer = null;
     if (mounted) setState(() => _previewingFile = null);
   }
 
