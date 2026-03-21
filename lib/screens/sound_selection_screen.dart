@@ -51,6 +51,31 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
   void initState() {
     super.initState();
     _selectedSoundId = widget.initialSoundId;
+    
+    // ✅ FIX: Find category of initialSoundId if provided
+    if (_selectedSoundId != null && _selectedSoundId!.isNotEmpty) {
+      if (_selectedSoundId!.startsWith('my_')) {
+        _activeTab = 'My Music';
+      } else {
+        bool found = false;
+        for (final entry in soundLibrary.entries) {
+          if (entry.value.any((s) => s.id == _selectedSoundId)) {
+            _activeCategory = entry.key;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          // Fallback check by file
+          for (final entry in soundLibrary.entries) {
+            for (final track in _myMusicTracks) { // This might be empty here as it's async
+               // ... but we check library first
+            }
+          }
+        }
+      }
+    }
+
     _loadSoundEnabled();
     _loadMyMusicTracks();
   }

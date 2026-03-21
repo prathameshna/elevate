@@ -71,12 +71,24 @@ class _RingingScreenState extends State<RingingScreen>
   }
 
   void _runMission(Map<String, dynamic> data) {
+    print('🎯 ========================================');
+    print('🎯 MISSION EXECUTION STARTED');
+    print('🎯 Mission Type: ${data['type']}');
+    print('🎯 Mission Config Keys: ${(data['config'] as Map).keys.toList()}');
+    print('🎯 ========================================');
+
     final type = data['type'] as String? ?? '';
 
     if (type == 'colour_tiles') {
       final config = ColourTilesConfig.fromJson(
         Map<String, dynamic>.from(data['config'] as Map),
       );
+      print('✅ [COLOUR_TILES] Mission Loaded:');
+      print('   - Difficulty: ${config.difficulty.label}');
+      print('   - Question Count: ${config.questionCount}');
+      print('   - Grid Size: ${config.difficulty.gridSize}x${config.difficulty.gridSize}');
+      print('   - Show Duration: ${config.difficulty.showDurationMs}ms');
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -90,6 +102,12 @@ class _RingingScreenState extends State<RingingScreen>
       final config = MemoryMissionConfig.fromJson(
         Map<String, dynamic>.from(data['config'] as Map),
       );
+      print('✅ [MEMORY] Mission Loaded:');
+      print('   - Difficulty: ${config.difficulty}');
+      print('   - Question Count: ${config.questionCount}');
+      print('   - Memorize Duration: ${config.memorizeDurationMs}ms');
+      print('   - Tiles to Memorize: ${config.tilesToMemorize}');
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -99,6 +117,8 @@ class _RingingScreenState extends State<RingingScreen>
           ),
         ),
       );
+    } else {
+      print('❌ [ERROR] Unknown mission type: $type');
     }
   }
 
@@ -234,9 +254,9 @@ class _RingingScreenState extends State<RingingScreen>
                         borderRadius: BorderRadius.circular(28),
                       ),
                     ),
-                    child: const Text(
-                      'Start Mission',
-                      style: TextStyle(
+                    child: Text(
+                      widget.alarm.missions.isEmpty ? 'Dismiss' : 'Start Mission',  // ✅ FIX: Conditional text
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.3,

@@ -40,17 +40,22 @@ class _VibrationScreenState extends State<VibrationScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _enabled    = prefs.getBool('vib_enabled')    ?? true;
-      _selectedId = prefs.getString('vib_id')
-          ?? widget.initialId
-          ?? 'basic';
+      _enabled = prefs.getBool('vib_enabled') ?? true;
+
+      // widget.initialId always wins — this is the alarm's own saved vibration
+      if (widget.initialId != null && widget.initialId!.isNotEmpty) {
+        _selectedId = widget.initialId!;
+      } else {
+        _selectedId = prefs.getString('vib_id') ?? 'basic';
+      }
     });
   }
 
   Future<void> _savePrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('vib_enabled',      _enabled);
-    await prefs.setString('vib_id',         _selectedId);
+    // Only save enabled toggle globally
+    // Do NOT save vib_id here — each alarm saves its own via Navigator.pop
+    await prefs.setBool('vib_enabled', _enabled);
   }
 
   // ── Actions ───────────────────────────────────────────────

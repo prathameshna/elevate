@@ -94,10 +94,10 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
     if (!_isEditMode) {
       _missionSlots = [null, null, null, null];
-      _selectedSoundId = null;
+      _selectedSoundId = 'bright_1';
+      _selectedSoundFile = 'bright_bell.mp3';
       _selectedVibrationId = 'basic';
       _wakeUpCheckEnabled = false;
-      _selectedSoundFile = null;
       _snoozeEnabled = false;
     }
 
@@ -149,20 +149,21 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
 
 
   String _getSoundName() {
-    // Check by ID first
-    if (_selectedSoundId != null && _selectedSoundId != 'default_alarm') {
+    // First try to match by ID
+    if (_selectedSoundId != null && _selectedSoundId!.isNotEmpty) {
       for (final sounds in soundLibrary.values) {
         for (final s in sounds) {
           if (s.id == _selectedSoundId) return s.name;
         }
       }
+      // Check my music tracks
       for (final track in _myMusicTracks) {
         if (track.id == _selectedSoundId) return track.name;
       }
       if (_selectedSoundId!.startsWith('my_')) return 'Custom Sound';
     }
 
-    // Fallback: check by file name
+    // Fallback: match by file name
     if (_selectedSoundFile != null && _selectedSoundFile!.isNotEmpty) {
       for (final sounds in soundLibrary.values) {
         for (final s in sounds) {
@@ -171,7 +172,8 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       }
     }
 
-    return 'Default';
+    // Final fallback
+    return 'Bright Bell';
   }
 
   String _getVibrationName() {
@@ -238,8 +240,10 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       setState(() {
         _snoozeMinutes = result['minutes'] as int;
         _alwaysSnooze = result['always'] as bool;
+        _snoozeEnabled = true;  // ✅ FIX: Enable snooze when configured
       });
       HapticFeedback.selectionClick();
+      print('✅ [SNOOZE] Configured: $_snoozeMinutes min, enabled: $_snoozeEnabled, alwaysSnooze: $_alwaysSnooze');
     }
   }
 
@@ -253,22 +257,24 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
           .where((s) => s != null)
           .map((s) => s!)
           .toList();
+      final resolvedSoundFile = _selectedSoundFile ?? 'bright_bell.mp3';
+final resolvedSoundId   = _selectedSoundId   ?? 'bright_bell';
 
       final alarm = app_alarm.Alarm(
-        id:                _isEditMode ? widget.alarmId! : const Uuid().v4(),
-        time:              _selectedTime,
-        selectedDays:      _selectedDays,
-        isEnabled:         _isEnabled,
-        label:             '', 
-        memoText:          _memoController.text.trim(),
-        soundId:           _selectedSoundId,
-        soundFile:         _selectedSoundFile ?? 'bright_bell.mp3',
-        soundEnabled:      true,
-        vibrationId:       _selectedVibrationId,
-        vibrationEnabled:  true,
-        snoozeEnabled:     _snoozeEnabled,
-        snoozeMinutes:     _snoozeMinutes,
-        missions:          missions,
+        id:               _isEditMode ? widget.alarmId! : const Uuid().v4(),
+        time:             _selectedTime,
+        selectedDays:     _selectedDays,
+        isEnabled:        _isEnabled,
+        label:            '',
+        memoText:         _memoController.text.trim(),
+        soundId:          _selectedSoundId ?? 'bright_1',
+        soundFile:        _selectedSoundFile ?? 'bright_bell.mp3',
+        soundEnabled:     true,
+        vibrationId:      _selectedVibrationId,
+        vibrationEnabled: true,
+        snoozeEnabled:    _snoozeEnabled,
+        snoozeMinutes:    _snoozeMinutes,
+        missions:         missions,
       );
 
       // Save to local storage
