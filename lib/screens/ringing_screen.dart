@@ -6,10 +6,12 @@ import '../models/alarm.dart';
 import '../alarm/alarm_manager.dart';
 import '../missions/colour_tiles/colour_tiles_challenge_screen.dart';
 import '../missions/colour_tiles/colour_tiles_model.dart';
+import '../missions/memory/memory_challenge_screen.dart';
+import '../missions/memory/memory_mission_model.dart';
 
 class RingingScreen extends StatefulWidget {
-  final Alarm                     alarm;
-  final alarm_pkg.AlarmSettings   alarmSettings;
+  final Alarm alarm;
+  final alarm_pkg.AlarmSettings alarmSettings;
 
   const RingingScreen({
     super.key,
@@ -23,22 +25,25 @@ class RingingScreen extends StatefulWidget {
 
 class _RingingScreenState extends State<RingingScreen>
     with SingleTickerProviderStateMixin {
-
-  int  _missionIndex = 0;
-  bool _dismissed    = false;
-
-  // Snooze button press animation
-
+  int _missionIndex = 0;
+  bool _dismissed = false;
+  late AnimationController _swipeCtrl;
 
   @override
   void initState() {
     super.initState();
     WakelockPlus.enable();
+    _swipeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    print('🔔 RingingScreen initialized');
   }
 
   @override
   void dispose() {
     WakelockPlus.disable();
+    _swipeCtrl.dispose();
     super.dispose();
   }
 
@@ -47,19 +52,27 @@ class _RingingScreenState extends State<RingingScreen>
   Future<void> _snooze() async {
     if (_dismissed) return;
     _dismissed = true;
+    print('💤 Snoozing alarm: ${widget.alarm.id}');
     HapticFeedback.mediumImpact();
     await AlarmManager.snooze(widget.alarm);
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) {
+      print('🔄 Snooze scheduled, popping ringing screen');
+      Navigator.of(context).pop();
+    }
   }
 
   void _startMission() {
     final missions = widget.alarm.missions;
-    if (missions.isEmpty) { _dismissAlarm(); return; }
+    if (missions.isEmpty) {
+      _dismissAlarm();
+      return;
+    }
     _runMission(missions[_missionIndex]);
   }
 
   void _runMission(Map<String, dynamic> data) {
     final type = data['type'] as String? ?? '';
+
     if (type == 'colour_tiles') {
       final config = ColourTilesConfig.fromJson(
         Map<String, dynamic>.from(data['config'] as Map),
@@ -68,7 +81,20 @@ class _RingingScreenState extends State<RingingScreen>
         context,
         MaterialPageRoute(
           builder: (_) => ColourTilesChallengeScreen(
-            config:     config,
+            config: config,
+            onComplete: _missionDone,
+          ),
+        ),
+      );
+    } else if (type == 'memory') {
+      final config = MemoryMissionConfig.fromJson(
+        Map<String, dynamic>.from(data['config'] as Map),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MemoryChallengeScreen(
+            config: config,
             onComplete: _missionDone,
           ),
         ),
@@ -92,6 +118,7 @@ class _RingingScreenState extends State<RingingScreen>
   Future<void> _dismissAlarm() async {
     if (_dismissed) return;
     _dismissed = true;
+    print('❌ Dismissing alarm: ${widget.alarm.id}');
     await AlarmManager.stopRinging(widget.alarm);
     if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
@@ -100,7 +127,8 @@ class _RingingScreenState extends State<RingingScreen>
 
   String get _timeString {
     final h = widget.alarm.time.hourOfPeriod == 0
-        ? 12 : widget.alarm.time.hourOfPeriod;
+        ? 12
+        : widget.alarm.time.hourOfPeriod;
     final m = widget.alarm.time.minute.toString().padLeft(2, '0');
     return '$h:$m';
   }
@@ -108,12 +136,27 @@ class _RingingScreenState extends State<RingingScreen>
   String get _dateString {
     final n = DateTime.now();
     const days = [
-      'Monday','Tuesday','Wednesday','Thursday',
-      'Friday','Saturday','Sunday'
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
     ];
     const months = [
-      'January','February','March','April','May','June',
-      'July','August','September','October','November','December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return '${days[n.weekday - 1]}, ${n.day} ${months[n.month - 1]} ${n.year}';
   }
@@ -122,150 +165,96 @@ class _RingingScreenState extends State<RingingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final missions      = widget.alarm.missions;
-    final hasMission    = missions.isNotEmpty;
     final snoozeEnabled = widget.alarm.snoozeEnabled;
-    final isAm          = widget.alarm.time.period == DayPeriod.am;
+    final snoozeMinutes = widget.alarm.snoozeMinutes;
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: const Color(0xFF080808),
+        backgroundColor: const Color(0xFF0A0A0A),
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-
-                const SizedBox(height: 32),
-
                 // ── Date ──────────────────────────────────
                 Text(
                   _dateString,
                   style: const TextStyle(
-                    color:         Color(0xFF888888),
-                    fontSize:      15,
-                    fontWeight:    FontWeight.w400,
-                    letterSpacing: 0.2,
+                    color: Color(0xFF888888),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.3,
                   ),
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 24),
 
-                // ── Time ──────────────────────────────────
+                // ── Time (Large & Bold) ───────────────────
                 Text(
                   _timeString,
                   style: const TextStyle(
-                    color:         Color(0xFFF5F5F5),
-                    fontSize:      78,
-                    fontWeight:    FontWeight.w700,
+                    color: Color(0xFFFFFAF0),
+                    fontSize: 88,
+                    fontWeight: FontWeight.w700,
+                    height: 1.0,
                     letterSpacing: -2,
-                    height:        1.0,
                   ),
                 ),
 
-                // ── AM / PM Badge ─────────────────────────
-                Text(
-                  isAm ? 'AM' : 'PM',
-                  style: const TextStyle(
-                    color:      Color(0xFF666666),
-                    fontSize:   18,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
+                const SizedBox(height: 32),
 
-                const SizedBox(height: 20),
-
-                // ── Label ─────────────────────────────────
+                // ── Alarm Label ───────────────────────────
                 if (widget.alarm.label.isNotEmpty)
                   Text(
                     widget.alarm.label,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color:      Color(0xFFCCCCCC),
-                      fontSize:   19,
+                      color: Color(0xFFCCCCCC),
+                      fontSize: 18,
                       fontWeight: FontWeight.w400,
+                      letterSpacing: 0.2,
                     ),
                   ),
-
-                // ── Memo ──────────────────────────────────
-                if (widget.alarm.memo?.isNotEmpty == true) ...[
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      widget.alarm.memo!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color:    Color(0xFF666666),
-                        fontSize: 14,
-                        height:   1.5,
-                      ),
-                    ),
-                  ),
-                ],
-
-                // ── Mission Indicator ─────────────────────
-                if (hasMission) ...[
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width:  8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFD600),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${missions.length} mission${missions.length > 1 ? 's' : ''} • ${_getMissionName(missions[0])}',
-                        style: const TextStyle(
-                          color:      Color(0xFF888888),
-                          fontSize:   12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
 
                 const Spacer(),
 
-                // ── Start Mission / Dismiss button ────────
+                // ── Start Mission Button ───────────────────
                 SizedBox(
-                  width:  double.infinity,
+                  width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
                     onPressed: _startMission,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFD600),
                       foregroundColor: Colors.black,
-                      elevation:       0,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32),
+                        borderRadius: BorderRadius.circular(28),
                       ),
                     ),
-                    child: Text(
-                      hasMission ? 'Start Mission' : 'Dismiss',
-                      style: const TextStyle(
-                        fontSize:      17,
-                        fontWeight:    FontWeight.w700,
-                        letterSpacing: -0.2,
+                    child: const Text(
+                      'Start Mission',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
-                // ── Snooze Button (Professional) ──────────
-                if (snoozeEnabled) _SnoozeButton(onSnooze: _snooze),
+                // ── Swipe to Snooze (ONLY if snoozeEnabled is TRUE) ───
+                if (snoozeEnabled)
+                  _SwipeToSnoozeWidget(
+                    onSnooze: _snooze,
+                    snoozeMinutes: snoozeMinutes,
+                  ),
 
-                const SizedBox(height: 36),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -273,135 +262,209 @@ class _RingingScreenState extends State<RingingScreen>
       ),
     );
   }
-
-  String _getMissionName(Map<String, dynamic> mission) {
-    final type = mission['type'] as String? ?? '';
-    switch (type) {
-      case 'colour_tiles': return 'Colour Tiles';
-      case 'math':         return 'Math';
-      case 'shake':        return 'Shake';
-      default:             return 'Challenge';
-    }
-  }
 }
 
 // ─────────────────────────────────────────────────────────
-// Professional Snooze Button
-// Two-part row: moon icon pill + "5 min" label + divider + "Snooze" text.
-// Uses GestureDetector for a custom press-down scale animation.
+// Swipe to Snooze Widget - FIXED: Requires full swipe
 // ─────────────────────────────────────────────────────────
 
-class _SnoozeButton extends StatefulWidget {
+class _SwipeToSnoozeWidget extends StatefulWidget {
   final VoidCallback onSnooze;
-  const _SnoozeButton({required this.onSnooze});
+  final int snoozeMinutes;
+
+  const _SwipeToSnoozeWidget({
+    required this.onSnooze,
+    required this.snoozeMinutes,
+  });
 
   @override
-  State<_SnoozeButton> createState() => _SnoozeButtonState();
+  State<_SwipeToSnoozeWidget> createState() => _SwipeToSnoozeWidgetState();
 }
 
-class _SnoozeButtonState extends State<_SnoozeButton>
+class _SwipeToSnoozeWidgetState extends State<_SwipeToSnoozeWidget>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double>   _scale;
+  double _dragOffset = 0;
+  bool _snoozed = false;
+  late AnimationController _animCtrl;
+  late Animation<double> _slideAnimation;
+
+  // ✅ NEW: Constants for threshold
+  static const double maxDragDistance = 250; // Total drag distance needed
+  static const double dragThreshold = 0.95; // 95% = must reach 95% to trigger
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 90),
-      reverseDuration: const Duration(milliseconds: 160),
-      lowerBound: 0.0,
-      upperBound: 1.0,
+      duration: const Duration(milliseconds: 400),
     );
-    _scale = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    _slideAnimation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
     );
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _animCtrl.dispose();
     super.dispose();
   }
 
-  void _onTapDown(_) => _ctrl.forward();
-  void _onTapUp(_)   { _ctrl.reverse(); widget.onSnooze(); }
-  void _onTapCancel() => _ctrl.reverse();
+  void _resetSwipe() {
+    _slideAnimation = Tween<double>(begin: _dragOffset, end: 0).animate(
+      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
+    );
+    _animCtrl.forward(from: 0).then((_) {
+      if (mounted) {
+        setState(() {
+          _dragOffset = 0;
+        });
+      }
+    });
+  }
+
+  void _completeSwipe() {
+    _slideAnimation = Tween<double>(begin: _dragOffset, end: maxDragDistance)
+        .animate(
+      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
+    );
+    _animCtrl.forward(from: 0).then((_) {
+      if (mounted) {
+        _snoozed = true;
+        HapticFeedback.heavyImpact();
+        widget.onSnooze();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Calculate progress percentage
+    final progress = (_dragOffset / maxDragDistance).clamp(0.0, 1.0);
+    final isDragComplete = progress >= dragThreshold;
+
     return GestureDetector(
-      onTapDown:   _onTapDown,
-      onTapUp:     _onTapUp,
-      onTapCancel: _onTapCancel,
-      child: ScaleTransition(
-        scale: _scale,
-        child: Container(
-          height:     54,
-          decoration: BoxDecoration(
-            color:        const Color(0xFF131313),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: const Color(0xFF2A2A2A),
-              width: 1,
+      onHorizontalDragUpdate: (details) {
+        if (_snoozed) return;
+
+        setState(() {
+          _dragOffset = (_dragOffset + details.delta.dx).clamp(0, maxDragDistance);
+        });
+      },
+      onHorizontalDragEnd: (details) {
+        if (_snoozed) return;
+
+        final progress = (_dragOffset / maxDragDistance).clamp(0.0, 1.0);
+
+        // ✅ FIXED: Require 95% completion
+        if (progress >= dragThreshold) {
+          print('✅ Swipe completed: $progress (${(progress * 100).toStringAsFixed(1)}%)');
+          _completeSwipe();
+        } else {
+          print('❌ Swipe incomplete: $progress (${(progress * 100).toStringAsFixed(1)}%) - needs ${(dragThreshold * 100).toStringAsFixed(0)}%');
+          _resetSwipe();
+        }
+      },
+      child: Container(
+        height: 54,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(27),
+          border: Border.all(
+            color: const Color(0xFF2A2A2A),
+            width: 1,
+          ),
+        ),
+        child: Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            // ── Background Progress Bar ───────────────────
+            AnimatedBuilder(
+              animation: _slideAnimation,
+              builder: (context, child) {
+                final currentProgress = _animCtrl.isAnimating
+                    ? _slideAnimation.value / maxDragDistance
+                    : progress;
+
+                return Container(
+                  width: (54 * currentProgress).clamp(0, 54),
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF14B8A6).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(27),
+                  ),
+                );
+              },
             ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
 
-              // ── Moon icon in a small pill ──────────────
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color:        const Color(0xFF1E1E1E),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
+            // ── Draggable Icon (Left side) ────────────────
+            AnimatedBuilder(
+              animation: _slideAnimation,
+              builder: (context, child) {
+                final currentOffset = _animCtrl.isAnimating
+                    ? _slideAnimation.value
+                    : _dragOffset;
+
+                return Positioned(
+                  left: 12 + (currentOffset * 0.8).clamp(0, 190),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2A2A2A),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
                       Icons.bedtime_rounded,
-                      color: Color(0xFF666666),
-                      size:  14,
+                      color: isDragComplete
+                          ? const Color(0xFF14B8A6)
+                          : const Color(0xFF888888),
+                      size: 20,
                     ),
-                    SizedBox(width: 5),
-                    Text(
-                      '5 min',
-                      style: TextStyle(
-                        color:      Color(0xFF666666),
-                        fontSize:   12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  ),
+                );
+              },
+            ),
+
+            // ── Swipe Text with Duration and Progress ─────
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'SWIPE TO SNOOZE (${widget.snoozeMinutes} min)',
+                    style: TextStyle(
+                      color: isDragComplete
+                          ? const Color(0xFF14B8A6)
+                          : const Color(0xFF606060),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: isDragComplete
+                          ? const Color(0xFF14B8A6)
+                          : const Color(0xFF505050),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
-
-              const SizedBox(width: 12),
-
-              // ── Vertical divider ───────────────────────
-              Container(
-                width:  1,
-                height: 20,
-                color:  const Color(0xFF252525),
-              ),
-
-              const SizedBox(width: 12),
-
-              // ── "Snooze" label ─────────────────────────
-              const Text(
-                'Snooze',
-                style: TextStyle(
-                  color:         Color(0xFF888888),
-                  fontSize:      15,
-                  fontWeight:    FontWeight.w500,
-                  letterSpacing: 0.1,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

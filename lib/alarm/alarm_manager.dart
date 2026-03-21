@@ -76,7 +76,7 @@ class AlarmManager {
         : 'assets/sounds/bright_bell.mp3';
 
     final snoozeSettings = alarm_pkg.AlarmSettings(
-      id:             _numericId(alarm.id) + 1,
+      id:             _numericId(alarm.id),
       dateTime:       snoozeTime,
       assetAudioPath: soundPath,
       loopAudio:      true,
