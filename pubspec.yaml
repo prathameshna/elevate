@@ -33,7 +33,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
-  alarm: ^4.0.0
+  alarm: 4.1.1
   wakelock_plus: ^1.1.4
   vibration: ^2.0.0
   shared_preferences: ^2.2.2

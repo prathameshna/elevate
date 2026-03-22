@@ -47,19 +47,53 @@ class _ElevateAppState extends State<ElevateApp> {
   @override
   void initState() {
     super.initState();
-    _alarmSub = alarm_pkg.Alarm.ringStream.stream.listen((alarm_pkg.AlarmSettings settings) async {
-      final alarm = await AlarmStorage.getByNumericId(settings.id);
-      if (alarm == null) return;
 
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => RingingScreen(
-            alarm:         alarm,
-            alarmSettings: settings,
-          ),
-        ),
-      );
+    // Fires when alarm rings and app is already running
+    _alarmSub = alarm_pkg.Alarm.ringStream.stream.listen(
+          (alarm_pkg.AlarmSettings settings) async {
+        await _showRingingScreen(settings);
+      },
+    );
+
+    // Fires when app is opened from notification tap or cold start
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkRingingOnStartup();
     });
+  }
+
+  Future<void> _checkRingingOnStartup() async {
+    try {
+      final alarms = await alarm_pkg.Alarm.getAlarms();
+      final now = DateTime.now();
+      for (final a in alarms) {
+        final diff = now.difference(a.dateTime).inSeconds;
+        if (diff >= 0 && diff <= 120) {
+          await _showRingingScreen(a);
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _showRingingScreen(alarm_pkg.AlarmSettings settings) async {
+    final alarm = await AlarmStorage.getByNumericId(settings.id);
+    if (alarm == null) return;
+
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => RingingScreen(
+          alarm: alarm,
+          alarmSettings: settings,
+        ),
+        fullscreenDialog: true,
+      ),
+          (route) => route.isFirst,
+    );
   }
 
   @override
@@ -72,12 +106,10 @@ class _ElevateAppState extends State<ElevateApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => AlarmProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => AlarmProvider()),
       ],
       child: MaterialApp(
-        navigatorKey: navigatorKey, // ← MUST have this
+        navigatorKey: navigatorKey,
         title: 'Elevate',
         debugShowCheckedModeBanner: false,
         themeMode: ThemeMode.dark,

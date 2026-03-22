@@ -25,8 +25,8 @@ class AlarmManager {
     if (scheduledTime.isBefore(now)) return;
 
     final soundPath = alarm.soundEnabled == true &&
-            alarm.soundFile != null &&
-            alarm.soundFile!.isNotEmpty
+        alarm.soundFile != null &&
+        alarm.soundFile!.isNotEmpty
         ? 'assets/sounds/${alarm.soundFile}'
         : 'assets/sounds/bright_bell.mp3';
 
@@ -38,7 +38,7 @@ class AlarmManager {
       vibrate:        alarm.vibrationEnabled,
       volume:         1.0,
       fadeDuration:   0,
-      warningNotificationOnKill: true,
+      warningNotificationOnKill: false,
       androidFullScreenIntent:   true,
       notificationSettings: alarm_pkg.NotificationSettings(
         title: alarm.label.isNotEmpty
@@ -70,8 +70,8 @@ class AlarmManager {
         .add(Duration(minutes: alarm.snoozeMinutes));
 
     final soundPath = alarm.soundEnabled == true &&
-            alarm.soundFile != null &&
-            alarm.soundFile!.isNotEmpty
+        alarm.soundFile != null &&
+        alarm.soundFile!.isNotEmpty
         ? 'assets/sounds/${alarm.soundFile}'
         : 'assets/sounds/bright_bell.mp3';
 
@@ -82,22 +82,22 @@ class AlarmManager {
       loopAudio:      true,
       vibrate:        alarm.vibrationEnabled,
       volume:         1.0,
+      fadeDuration:   0,
       androidFullScreenIntent: true,
       notificationSettings: alarm_pkg.NotificationSettings(
         title: 'Snoozed — ${alarm.label.isNotEmpty ? alarm.label : "Alarm"}',
         body:  'Ringing again in ${alarm.snoozeMinutes} minutes',
         icon:  'notification_icon',
+        stopButton: 'Dismiss',
       ),
     );
 
     await alarm_pkg.Alarm.set(alarmSettings: snoozeSettings);
   }
 
-  // Convert string UUID to valid int ID
   static int _numericId(String id) =>
       id.hashCode.abs() % 2147483647;
 
-  // Find next occurrence DateTime for alarm
   static DateTime? _nextOccurrence(app_alarm.Alarm alarm) {
     final now = DateTime.now();
     var candidate = DateTime(
@@ -114,7 +114,7 @@ class AlarmManager {
 
     for (int i = 0; i < 8; i++) {
       final check   = candidate.add(Duration(days: i));
-      final weekday = check.weekday % 7; // 0=Sun, 1=Mon ... 6=Sat
+      final weekday = check.weekday % 7;
       if (alarm.days.contains(weekday) && check.isAfter(now)) {
         return check;
       }
