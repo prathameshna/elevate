@@ -6,8 +6,8 @@ import '../models/alarm.dart';
 import '../alarm/alarm_manager.dart';
 import '../missions/colour_tiles/colour_tiles_challenge_screen.dart';
 import '../missions/colour_tiles/colour_tiles_model.dart';
-import '../missions/memory/memory_challenge_screen.dart';
-import '../missions/memory/memory_mission_model.dart';
+import '../missions/typing/typing_challenge_screen.dart';
+import '../missions/typing/typing_mission_model.dart';
 
 class RingingScreen extends StatefulWidget {
   final Alarm alarm;
@@ -91,10 +91,10 @@ class _RingingScreenState extends State<RingingScreen>
           onComplete: _missionDone,
         ),
       ));
-    } else if (type == 'memory') {
-      final config = MemoryMissionConfig.fromJson(configMap);
+    } else if (type == 'typing') {
+      final config = TypingMissionConfig.fromJson(configMap);
       Navigator.push(context, MaterialPageRoute(
-        builder: (_) => MemoryChallengeScreen(
+        builder: (_) => TypingChallengeScreen(
           config:     config,
           onComplete: _missionDone,
         ),
@@ -395,9 +395,9 @@ class _SnoozeSliderState extends State<_SnoozeSlider>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF1D9E75).withOpacity(
+                          const Color(0xFF1D9E75).withValues(alpha: 
                               _snoozed ? 0.22 : 0.18),
-                          const Color(0xFF1D9E75).withOpacity(0.06),
+                          const Color(0xFF1D9E75).withValues(alpha: 0.06),
                         ],
                       ),
                     ),
@@ -423,7 +423,7 @@ class _SnoozeSliderState extends State<_SnoozeSlider>
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: const Color(0xFF1D9E75)
-                                .withOpacity(0.4),
+                                .withValues(alpha: 0.4),
                             width: 1.5,
                           ),
                         ),
@@ -497,7 +497,7 @@ class _SnoozeSliderState extends State<_SnoozeSlider>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color:      Colors.black.withOpacity(0.4),
+                        color:      Colors.black.withValues(alpha: 0.4),
                         blurRadius: 12,
                         offset:     const Offset(0, 2),
                       ),

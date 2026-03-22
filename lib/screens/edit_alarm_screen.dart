@@ -13,6 +13,8 @@ import '../services/alarm_storage.dart';
 import '../widgets/day_selector/day_selector_widget.dart';
 import '../missions/colour_tiles/colour_tiles_config_screen.dart';
 import '../missions/colour_tiles/colour_tiles_model.dart';
+import '../missions/typing/typing_config_screen.dart';
+import '../missions/typing/typing_mission_model.dart';
 import 'mission_list_screen.dart';
 import '../widgets/time_picker/time_picker_wheel.dart';
 import '../widgets/snooze_config_modal.dart';
@@ -68,10 +70,10 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
   Future<void> _loadMyMusicTracks() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final encoded = prefs.getStringList('my_music_tracks') ?? [];
-      if (mounted) {
+      final List<String>? tracks = prefs.getStringList('my_music_tracks');
+      if (mounted && tracks != null && tracks.isNotEmpty) {
         setState(() {
-          _myMusicTracks = encoded
+          _myMusicTracks = tracks
               .map((e) => MyMusicTrack.fromJson(jsonDecode(e)))
               .toList();
         });
@@ -98,7 +100,9 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
       _selectedSoundFile = 'bright_bell.mp3';
       _selectedVibrationId = 'basic';
       _wakeUpCheckEnabled = false;
-      _snoozeEnabled = false;
+      _snoozeEnabled = true;     // ← snooze ON by default
+      _snoozeMinutes = 5;        // ← 5 minutes by default
+      _alwaysSnooze = true;      // ← always snooze ON by default
     }
 
     _memoController = TextEditingController(text: _memoText);
@@ -132,7 +136,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
           _memoController.text = _memoText;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -243,7 +247,7 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         _snoozeEnabled = true;  // ✅ FIX: Enable snooze when configured
       });
       HapticFeedback.selectionClick();
-      print('✅ [SNOOZE] Configured: $_snoozeMinutes min, enabled: $_snoozeEnabled, alwaysSnooze: $_alwaysSnooze');
+      debugPrint('✅ [SNOOZE] Configured: $_snoozeMinutes min, enabled: $_snoozeEnabled, alwaysSnooze: $_alwaysSnooze');
     }
   }
 
@@ -936,6 +940,19 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
           });
         }
         break;
+      case 'typing':
+        final config = await Navigator.push<TypingMissionConfig>(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const TypingConfigScreen()),
+        );
+        if (config != null && mounted) {
+          setState(() => _missionSlots[index] = {
+            'type':   'typing',
+            'config': config.toJson(),
+          });
+        }
+        break;
       default:
         break;
     }
@@ -958,6 +975,23 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         setState(() {
           _missionSlots[index] = {
             'type':   'colour_tiles',
+            'config': config.toJson(),
+          };
+        });
+      }
+    } else if (type == 'typing') {
+      final existing = TypingMissionConfig.fromJson(
+          Map<String, dynamic>.from(slot['config'] as Map));
+      final config = await Navigator.push<TypingMissionConfig>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TypingConfigScreen(initialConfig: existing),
+        ),
+      );
+      if (config != null && mounted) {
+        setState(() {
+          _missionSlots[index] = {
+            'type':   'typing',
             'config': config.toJson(),
           };
         });

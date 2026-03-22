@@ -33,7 +33,15 @@ const List<MissionDefinition> kAllMissions = [
     icon:         Icons.grid_view_rounded,
     iconBgColor:  Color(0xFF0D5C63),
     isLocked:     false,
-    isBuilt:      true,   // ← current built mission
+    isBuilt:      true,
+  ),
+  MissionDefinition(
+    id:           'typing',
+    name:         'Typing',
+    icon:         Icons.keyboard_rounded,
+    iconBgColor:  Color(0xFF6366F1),
+    isLocked:     false,
+    isBuilt:      true,
   ),
 ];
 
@@ -69,7 +77,7 @@ class MissionListScreen extends StatelessWidget {
 
           // ── Wake your brain ───────────────────────
           const _SectionHeader('Wake your brain'),
-          ..._missionsWhere((m) => m.id == 'colour_tiles', context),
+          ..._missionsWhere((m) => m.id == 'colour_tiles' || m.id == 'typing', context),
 
           const SizedBox(height: 32),
 
