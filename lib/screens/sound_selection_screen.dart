@@ -263,9 +263,15 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
+    return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          Navigator.pop(context, _buildResult());
+        },
+        child: Scaffold(
+          backgroundColor: const Color(0xFF1A1A1A),
+          appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
         leading: IconButton(
@@ -318,6 +324,7 @@ class _SoundSelectionScreenState extends State<SoundSelectionScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 

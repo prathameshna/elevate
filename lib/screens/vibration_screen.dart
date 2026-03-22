@@ -86,11 +86,17 @@ class _VibrationScreenState extends State<VibrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
+    return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          Navigator.pop(context, _selectedId);
+        },
+        child: Scaffold(
+          backgroundColor: const Color(0xFF1A1A1A),
 
-      // AppBar
-      appBar: AppBar(
+          // AppBar
+          appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -121,6 +127,7 @@ class _VibrationScreenState extends State<VibrationScreen> {
         ),
         child: _buildCard(),
       ),
+        ),
     );
   }
 
@@ -189,6 +196,7 @@ class _VibrationScreenState extends State<VibrationScreen> {
               ),
             ),
           ),
+
         ],
       ),
     );

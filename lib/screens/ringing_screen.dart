@@ -25,42 +25,40 @@ class RingingScreen extends StatefulWidget {
 
 class _RingingScreenState extends State<RingingScreen>
     with SingleTickerProviderStateMixin {
-  int _missionIndex = 0;
-  bool _dismissed = false;
-  late AnimationController _swipeCtrl;
+
+  int  _missionIndex = 0;
+  bool _dismissed    = false;
 
   @override
   void initState() {
     super.initState();
     WakelockPlus.enable();
-    _swipeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    print('🔔 RingingScreen initialized');
   }
 
   @override
   void dispose() {
     WakelockPlus.disable();
-    _swipeCtrl.dispose();
     super.dispose();
   }
 
-  // ── Actions ───────────────────────────────────────────
-
+  // ── Snooze ───────────────────────────────────────────────
   Future<void> _snooze() async {
     if (_dismissed) return;
     _dismissed = true;
-    print('💤 Snoozing alarm: ${widget.alarm.id}');
-    HapticFeedback.mediumImpact();
+    HapticFeedback.heavyImpact();
     await AlarmManager.snooze(widget.alarm);
-    if (mounted) {
-      print('🔄 Snooze scheduled, popping ringing screen');
-      Navigator.of(context).pop();
-    }
+    if (mounted) Navigator.of(context).pop();
   }
 
+  // ── Dismiss ──────────────────────────────────────────────
+  Future<void> _dismissAlarm() async {
+    if (_dismissed) return;
+    _dismissed = true;
+    await AlarmManager.stopRinging(widget.alarm);
+    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
+  // ── Start Mission ─────────────────────────────────────────
   void _startMission() {
     final missions = widget.alarm.missions;
     if (missions.isEmpty) {
@@ -71,54 +69,38 @@ class _RingingScreenState extends State<RingingScreen>
   }
 
   void _runMission(Map<String, dynamic> data) {
-    print('🎯 ========================================');
-    print('🎯 MISSION EXECUTION STARTED');
-    print('🎯 Mission Type: ${data['type']}');
-    print('🎯 Mission Config Keys: ${(data['config'] as Map).keys.toList()}');
-    print('🎯 ========================================');
+    final type      = data['type'] as String? ?? '';
+    final rawConfig = data['config'];
 
-    final type = data['type'] as String? ?? '';
+    if (rawConfig == null) {
+      _dismissAlarm();
+      return;
+    }
+
+    final configMap = Map<String, dynamic>.from(rawConfig as Map);
 
     if (type == 'colour_tiles') {
-      final config = ColourTilesConfig.fromJson(
-        Map<String, dynamic>.from(data['config'] as Map),
+      final config = ColourTilesConfig(
+        difficulty:    CTDifficultyX.fromKey(
+            configMap['difficulty'] as String? ?? 'normal'),
+        questionCount: configMap['questionCount'] as int? ?? 3,
       );
-      print('✅ [COLOUR_TILES] Mission Loaded:');
-      print('   - Difficulty: ${config.difficulty.label}');
-      print('   - Question Count: ${config.questionCount}');
-      print('   - Grid Size: ${config.difficulty.gridSize}x${config.difficulty.gridSize}');
-      print('   - Show Duration: ${config.difficulty.showDurationMs}ms');
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ColourTilesChallengeScreen(
-            config: config,
-            onComplete: _missionDone,
-          ),
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => ColourTilesChallengeScreen(
+          config:     config,
+          onComplete: _missionDone,
         ),
-      );
+      ));
     } else if (type == 'memory') {
-      final config = MemoryMissionConfig.fromJson(
-        Map<String, dynamic>.from(data['config'] as Map),
-      );
-      print('✅ [MEMORY] Mission Loaded:');
-      print('   - Difficulty: ${config.difficulty}');
-      print('   - Question Count: ${config.questionCount}');
-      print('   - Memorize Duration: ${config.memorizeDurationMs}ms');
-      print('   - Tiles to Memorize: ${config.tilesToMemorize}');
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MemoryChallengeScreen(
-            config: config,
-            onComplete: _missionDone,
-          ),
+      final config = MemoryMissionConfig.fromJson(configMap);
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => MemoryChallengeScreen(
+          config:     config,
+          onComplete: _missionDone,
         ),
-      );
+      ));
     } else {
-      print('❌ [ERROR] Unknown mission type: $type');
+      _dismissAlarm();
     }
   }
 
@@ -135,148 +117,159 @@ class _RingingScreenState extends State<RingingScreen>
     }
   }
 
-  Future<void> _dismissAlarm() async {
-    if (_dismissed) return;
-    _dismissed = true;
-    print('❌ Dismissing alarm: ${widget.alarm.id}');
-    await AlarmManager.stopRinging(widget.alarm);
-    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
-  }
-
-  // ── Formatting ────────────────────────────────────────
-
+  // ── Helpers ───────────────────────────────────────────────
   String get _timeString {
     final h = widget.alarm.time.hourOfPeriod == 0
-        ? 12
-        : widget.alarm.time.hourOfPeriod;
+        ? 12 : widget.alarm.time.hourOfPeriod;
     final m = widget.alarm.time.minute.toString().padLeft(2, '0');
     return '$h:$m';
   }
 
   String get _dateString {
     final n = DateTime.now();
-    const days = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday'
-    ];
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December'
-    ];
+    const days = ['Monday','Tuesday','Wednesday',
+      'Thursday','Friday','Saturday','Sunday'];
+    const months = ['January','February','March','April','May','June',
+      'July','August','September','October','November','December'];
     return '${days[n.weekday - 1]}, ${n.day} ${months[n.month - 1]} ${n.year}';
   }
 
-  // ── Build ─────────────────────────────────────────────
+  String get _snoozeTimeString {
+    final t = DateTime.now()
+        .add(Duration(minutes: widget.alarm.snoozeMinutes));
+    final h = t.hour > 12 ? t.hour - 12 : (t.hour == 0 ? 12 : t.hour);
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final hasMission    = widget.alarm.missions.isNotEmpty;
     final snoozeEnabled = widget.alarm.snoozeEnabled;
-    final snoozeMinutes = widget.alarm.snoozeMinutes;
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0A0A0A),
+        backgroundColor: const Color(0xFF0E0E0E),
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // ── Date ──────────────────────────────────
-                Text(
-                  _dateString,
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 0.3,
+          child: Column(
+            children: [
+
+              const Spacer(flex: 2),
+
+              // ── Time ──────────────────────────────────────
+              Text(
+                _timeString,
+                style: const TextStyle(
+                  color:         Color(0xFFF0F0F0),
+                  fontSize:      72,
+                  fontWeight:    FontWeight.w300,
+                  letterSpacing: -2,
+                  height:        1.0,
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              // ── Date / Label ───────────────────────────────
+              Text(
+                widget.alarm.label.isNotEmpty
+                    ? widget.alarm.label
+                    : _dateString,
+                style: const TextStyle(
+                  color:         Color(0xFF555555),
+                  fontSize:      12,
+                  letterSpacing: 3,
+                  fontWeight:    FontWeight.w400,
+                ),
+              ),
+
+              const Spacer(flex: 3),
+
+              // ── Snooze slider ──────────────────────────────
+              if (snoozeEnabled)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'SLIDE TO SNOOZE',
+                        style: TextStyle(
+                          color:         Color(0xFF444444),
+                          fontSize:      11,
+                          letterSpacing: 2.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _SnoozeSlider(
+                        snoozeMinutes: widget.alarm.snoozeMinutes,
+                        snoozeTime:    _snoozeTimeString,
+                        onSnooze:      _snooze,
+                      ),
+                    ],
                   ),
                 ),
 
-                const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-                // ── Time (Large & Bold) ───────────────────
-                Text(
-                  _timeString,
-                  style: const TextStyle(
-                    color: Color(0xFFFFFAF0),
-                    fontSize: 88,
-                    fontWeight: FontWeight.w700,
-                    height: 1.0,
-                    letterSpacing: -2,
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // ── Alarm Label ───────────────────────────
-                if (widget.alarm.label.isNotEmpty)
-                  Text(
-                    widget.alarm.label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFFCCCCCC),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-
-                const Spacer(),
-
-                // ── Start Mission Button ───────────────────
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
+              // ── Start Mission OR Dismiss button ────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 48),
+                child: SizedBox(
+                  width:  double.infinity,
+                  height: 52,
+                  child: hasMission
+                  // Has mission → yellow Start Mission button
+                      ? ElevatedButton(
                     onPressed: _startMission,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFD600),
                       foregroundColor: Colors.black,
-                      elevation: 0,
+                      elevation:       0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(28),
                       ),
                     ),
-                    child: Text(
-                      widget.alarm.missions.isEmpty ? 'Dismiss' : 'Start Mission',  // ✅ FIX: Conditional text
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
+                    child: const Text(
+                      'Start Mission',
+                      style: TextStyle(
+                        fontSize:   15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                  // No mission → outlined Dismiss button
+                      : OutlinedButton(
+                    onPressed: _dismissAlarm,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF888888),
+                      side: const BorderSide(
+                        color: Color(0xFF2A2A2A),
+                        width: 1,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    child: const Text(
+                      'Dismiss',
+                      style: TextStyle(
+                        fontSize:      15,
+                        fontWeight:    FontWeight.w500,
+                        letterSpacing: 1,
+                        color:         Color(0xFF888888),
                       ),
                     ),
                   ),
                 ),
+              ),
 
-                const SizedBox(height: 20),
+              // ── Bottom padding ─────────────────────────────
+              SizedBox(
+                height: MediaQuery.of(context).padding.bottom + 24,
+              ),
 
-                // ── Swipe to Snooze (ONLY if snoozeEnabled is TRUE) ───
-                if (snoozeEnabled)
-                  _SwipeToSnoozeWidget(
-                    onSnooze: _snooze,
-                    snoozeMinutes: snoozeMinutes,
-                  ),
-
-                const SizedBox(height: 20),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -285,208 +278,254 @@ class _RingingScreenState extends State<RingingScreen>
 }
 
 // ─────────────────────────────────────────────────────────
-// Swipe to Snooze Widget - FIXED: Requires full swipe
+// Snooze Slider
 // ─────────────────────────────────────────────────────────
 
-class _SwipeToSnoozeWidget extends StatefulWidget {
+class _SnoozeSlider extends StatefulWidget {
+  final int          snoozeMinutes;
+  final String       snoozeTime;
   final VoidCallback onSnooze;
-  final int snoozeMinutes;
 
-  const _SwipeToSnoozeWidget({
-    required this.onSnooze,
+  const _SnoozeSlider({
     required this.snoozeMinutes,
+    required this.snoozeTime,
+    required this.onSnooze,
   });
 
   @override
-  State<_SwipeToSnoozeWidget> createState() => _SwipeToSnoozeWidgetState();
+  State<_SnoozeSlider> createState() => _SnoozeSliderState();
 }
 
-class _SwipeToSnoozeWidgetState extends State<_SwipeToSnoozeWidget>
+class _SnoozeSliderState extends State<_SnoozeSlider>
     with SingleTickerProviderStateMixin {
-  double _dragOffset = 0;
-  bool _snoozed = false;
-  late AnimationController _animCtrl;
-  late Animation<double> _slideAnimation;
 
-  // ✅ NEW: Constants for threshold
-  static const double maxDragDistance = 250; // Total drag distance needed
-  static const double dragThreshold = 0.95; // 95% = must reach 95% to trigger
+  double _dragX    = 0;
+  bool   _snoozed  = false;
+  bool   _dragging = false;
+
+  late AnimationController _rippleCtrl;
+  late Animation<double>   _rippleScale;
+  late Animation<double>   _rippleOpacity;
+
+  static const double _height    = 64;
+  static const double _thumbSize = 56;
+  static const double _padding   = 4;
 
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
+    _rippleCtrl = AnimationController(
+      vsync:    this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+    _rippleScale = Tween<double>(begin: 1.0, end: 2.2).animate(
+      CurvedAnimation(parent: _rippleCtrl, curve: Curves.easeOut),
     );
-    _slideAnimation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
+    _rippleOpacity = Tween<double>(begin: 0.6, end: 0.0).animate(
+      CurvedAnimation(parent: _rippleCtrl, curve: Curves.easeOut),
     );
   }
 
   @override
   void dispose() {
-    _animCtrl.dispose();
+    _rippleCtrl.dispose();
     super.dispose();
   }
 
-  void _resetSwipe() {
-    _slideAnimation = Tween<double>(begin: _dragOffset, end: 0).animate(
-      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
-    );
-    _animCtrl.forward(from: 0).then((_) {
-      if (mounted) {
-        setState(() {
-          _dragOffset = 0;
-        });
-      }
+  void _onDragUpdate(DragUpdateDetails d, double maxX) {
+    if (_snoozed) return;
+    setState(() {
+      _dragX    = (_dragX + d.delta.dx).clamp(0, maxX);
+      _dragging = true;
     });
   }
 
-  void _completeSwipe() {
-    _slideAnimation = Tween<double>(begin: _dragOffset, end: maxDragDistance)
-        .animate(
-      CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic),
-    );
-    _animCtrl.forward(from: 0).then((_) {
-      if (mounted) {
+  void _onDragEnd(DragEndDetails d, double maxX) {
+    if (_snoozed) return;
+    if (_dragX >= maxX * 0.95) {
+      setState(() {
         _snoozed = true;
-        HapticFeedback.heavyImpact();
-        widget.onSnooze();
-      }
-    });
+        _dragX   = maxX;
+      });
+      _rippleCtrl.stop();
+      HapticFeedback.heavyImpact();
+      Future.delayed(
+        const Duration(milliseconds: 600),
+        widget.onSnooze,
+      );
+    } else {
+      setState(() {
+        _dragX    = 0;
+        _dragging = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Calculate progress percentage
-    final progress = (_dragOffset / maxDragDistance).clamp(0.0, 1.0);
-    final isDragComplete = progress >= dragThreshold;
+    return LayoutBuilder(builder: (_, constraints) {
+      final trackWidth = constraints.maxWidth;
+      final maxX       = trackWidth - _thumbSize - _padding * 2;
+      final progress   = (_dragX / maxX).clamp(0.0, 1.0);
 
-    return GestureDetector(
-      onHorizontalDragUpdate: (details) {
-        if (_snoozed) return;
-
-        setState(() {
-          _dragOffset = (_dragOffset + details.delta.dx).clamp(0, maxDragDistance);
-        });
-      },
-      onHorizontalDragEnd: (details) {
-        if (_snoozed) return;
-
-        final progress = (_dragOffset / maxDragDistance).clamp(0.0, 1.0);
-
-        // ✅ FIXED: Require 95% completion
-        if (progress >= dragThreshold) {
-          print('✅ Swipe completed: $progress (${(progress * 100).toStringAsFixed(1)}%)');
-          _completeSwipe();
-        } else {
-          print('❌ Swipe incomplete: $progress (${(progress * 100).toStringAsFixed(1)}%) - needs ${(dragThreshold * 100).toStringAsFixed(0)}%');
-          _resetSwipe();
-        }
-      },
-      child: Container(
-        height: 54,
+      return Container(
+        height: _height,
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(27),
-          border: Border.all(
+          color:        const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(32),
+          border:       Border.all(
             color: const Color(0xFF2A2A2A),
-            width: 1,
+            width: 0.5,
           ),
         ),
         child: Stack(
           alignment: Alignment.centerLeft,
           children: [
-            // ── Background Progress Bar ───────────────────
-            AnimatedBuilder(
-              animation: _slideAnimation,
-              builder: (context, child) {
-                final currentProgress = _animCtrl.isAnimating
-                    ? _slideAnimation.value / maxDragDistance
-                    : progress;
 
-                return Container(
-                  width: (54 * currentProgress).clamp(0, 54),
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF14B8A6).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(27),
-                  ),
-                );
-              },
-            ),
-
-            // ── Draggable Icon (Left side) ────────────────
-            AnimatedBuilder(
-              animation: _slideAnimation,
-              builder: (context, child) {
-                final currentOffset = _animCtrl.isAnimating
-                    ? _slideAnimation.value
-                    : _dragOffset;
-
-                return Positioned(
-                  left: 12 + (currentOffset * 0.8).clamp(0, 190),
-                  child: Container(
-                    width: 40,
-                    height: 40,
+            // Fill bar
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedContainer(
+                    duration: Duration.zero,
+                    width:  trackWidth * progress,
+                    height: _height,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.bedtime_rounded,
-                      color: isDragComplete
-                          ? const Color(0xFF14B8A6)
-                          : const Color(0xFF888888),
-                      size: 20,
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF1D9E75).withOpacity(
+                              _snoozed ? 0.22 : 0.18),
+                          const Color(0xFF1D9E75).withOpacity(0.06),
+                        ],
+                      ),
                     ),
                   ),
-                );
-              },
-            ),
-
-            // ── Swipe Text with Duration and Progress ─────
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'SWIPE TO SNOOZE (${widget.snoozeMinutes} min)',
-                    style: TextStyle(
-                      color: isDragComplete
-                          ? const Color(0xFF14B8A6)
-                          : const Color(0xFF606060),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${(progress * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      color: isDragComplete
-                          ? const Color(0xFF14B8A6)
-                          : const Color(0xFF505050),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
+
+            // Ripple ring
+            if (!_snoozed && !_dragging)
+              Positioned(
+                left: _padding,
+                child: AnimatedBuilder(
+                  animation: _rippleCtrl,
+                  builder: (_, __) => Transform.scale(
+                    scale: _rippleScale.value,
+                    child: Opacity(
+                      opacity: _rippleOpacity.value,
+                      child: Container(
+                        width:  _thumbSize,
+                        height: _thumbSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFF1D9E75)
+                                .withOpacity(0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Center label
+            if (!_snoozed && progress < 0.15)
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Snooze',
+                      style: TextStyle(
+                        color:         Color(0xFF888888),
+                        fontSize:      12,
+                        fontWeight:    FontWeight.w500,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    Text(
+                      '${widget.snoozeMinutes} min',
+                      style: const TextStyle(
+                        color:         Color(0xFF555555),
+                        fontSize:      10,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Snoozed message
+            if (_snoozed)
+              Center(
+                child: Text(
+                  'Snoozed · ${widget.snoozeMinutes} min',
+                  style: const TextStyle(
+                    color:         Color(0xFF1D9E75),
+                    fontSize:      11,
+                    fontWeight:    FontWeight.w500,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+
+            // Draggable thumb
+            Positioned(
+              left: _padding + _dragX,
+              child: GestureDetector(
+                onHorizontalDragUpdate: (d) => _onDragUpdate(d, maxX),
+                onHorizontalDragEnd:    (d) => _onDragEnd(d, maxX),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 50),
+                  width:  _thumbSize,
+                  height: _thumbSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _snoozed
+                        ? const Color(0xFF1D9E75)
+                        : const Color(0xFF1E1E1E),
+                    border: Border.all(
+                      color: _snoozed
+                          ? const Color(0xFF1D9E75)
+                          : const Color(0xFF333333),
+                      width: 0.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color:      Colors.black.withOpacity(0.4),
+                        blurRadius: 12,
+                        offset:     const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: _snoozed
+                        ? const Icon(
+                      Icons.check_rounded,
+                      key:   ValueKey('check'),
+                      color: Colors.white,
+                      size:  20,
+                    )
+                        : const Icon(
+                      Icons.bedtime_rounded,
+                      key:   ValueKey('moon'),
+                      color: Color(0xFF888888),
+                      size:  20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 }

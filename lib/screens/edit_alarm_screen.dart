@@ -257,8 +257,6 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
           .where((s) => s != null)
           .map((s) => s!)
           .toList();
-      final resolvedSoundFile = _selectedSoundFile ?? 'bright_bell.mp3';
-final resolvedSoundId   = _selectedSoundId   ?? 'bright_bell';
 
       final alarm = app_alarm.Alarm(
         id:               _isEditMode ? widget.alarmId! : const Uuid().v4(),
