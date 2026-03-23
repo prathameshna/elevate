@@ -8,6 +8,8 @@ import '../missions/colour_tiles/colour_tiles_challenge_screen.dart';
 import '../missions/colour_tiles/colour_tiles_model.dart';
 import '../missions/typing/typing_challenge_screen.dart';
 import '../missions/typing/typing_mission_model.dart';
+import '../missions/tap/tap_challenge_screen.dart';
+import '../missions/tap/tap_mission_model.dart';
 
 class RingingScreen extends StatefulWidget {
   final Alarm alarm;
@@ -95,6 +97,14 @@ class _RingingScreenState extends State<RingingScreen>
       final config = TypingMissionConfig.fromJson(configMap);
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => TypingChallengeScreen(
+          config:     config,
+          onComplete: _missionDone,
+        ),
+      ));
+    } else if (type == 'tap') {
+      final config = TapMissionConfig.fromJson(configMap);
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => TapChallengeScreen(
           config:     config,
           onComplete: _missionDone,
         ),

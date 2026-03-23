@@ -43,6 +43,14 @@ const List<MissionDefinition> kAllMissions = [
     isLocked:     false,
     isBuilt:      true,
   ),
+  MissionDefinition(
+    id:           'tap',
+    name:         'Tap Challenge',
+    icon:         Icons.touch_app_rounded,
+    iconBgColor:  Color(0xFFFACC15),
+    isLocked:     false,
+    isBuilt:      true,
+  ),
 ];
 
 // ── Mission List Screen ────────────────────────────────────
@@ -77,7 +85,7 @@ class MissionListScreen extends StatelessWidget {
 
           // ── Wake your brain ───────────────────────
           const _SectionHeader('Wake your brain'),
-          ..._missionsWhere((m) => m.id == 'colour_tiles' || m.id == 'typing', context),
+          ..._missionsWhere((m) => m.id == 'colour_tiles' || m.id == 'typing' || m.id == 'tap', context),
 
           const SizedBox(height: 32),
 

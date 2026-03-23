@@ -15,6 +15,8 @@ import '../missions/colour_tiles/colour_tiles_config_screen.dart';
 import '../missions/colour_tiles/colour_tiles_model.dart';
 import '../missions/typing/typing_config_screen.dart';
 import '../missions/typing/typing_mission_model.dart';
+import '../missions/tap/tap_config_screen.dart';
+import '../missions/tap/tap_mission_model.dart';
 import 'mission_list_screen.dart';
 import '../widgets/time_picker/time_picker_wheel.dart';
 import '../widgets/snooze_config_modal.dart';
@@ -953,6 +955,19 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
           });
         }
         break;
+      case 'tap':
+        final config = await Navigator.push<TapMissionConfig>(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const TapConfigScreen()),
+        );
+        if (config != null && mounted) {
+          setState(() => _missionSlots[index] = {
+            'type':   'tap',
+            'config': config.toJson(),
+          });
+        }
+        break;
       default:
         break;
     }
@@ -992,6 +1007,23 @@ class _EditAlarmScreenState extends State<EditAlarmScreen> {
         setState(() {
           _missionSlots[index] = {
             'type':   'typing',
+            'config': config.toJson(),
+          };
+        });
+      }
+    } else if (type == 'tap') {
+      final existing = TapMissionConfig.fromJson(
+          Map<String, dynamic>.from(slot['config'] as Map));
+      final config = await Navigator.push<TapMissionConfig>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TapConfigScreen(initialConfig: existing),
+        ),
+      );
+      if (config != null && mounted) {
+        setState(() {
+          _missionSlots[index] = {
+            'type':   'tap',
             'config': config.toJson(),
           };
         });
